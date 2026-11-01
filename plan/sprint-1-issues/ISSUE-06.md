@@ -1,4 +1,4 @@
-# Issue #6 — E2E Tests, Responsive Evidence & Deliverable 1 Release
+# ISSUE-06 — E2E Tests, Responsive Evidence & Deliverable 1 Release
 
 ---
 
@@ -8,7 +8,7 @@
 | **Type** | `test` |
 | **Branch** | `test/issue-06-e2e-and-deliverable1-evidence` |
 | **Wave** | 4 (Final integration — all feature issues must merge first) |
-| **Depends on** | ISSUE-04 AND ISSUE-05 both merged to `sprint-1-staging` |
+| **Depends on** | `ISSUE-04` AND `ISSUE-05` both merged to `sprint-1-staging` |
 | **Parallel-safe** | ❌ No — depends on all Sprint 1 features being complete |
 | **Est** | L |
 | **Deliverable** | Part F + Release PR (Deliverable 1 Submission) |
@@ -21,9 +21,9 @@ Implement Playwright E2E tests covering 3 viewports, capture responsive screensh
 ---
 
 ## Pre-Implementation Checklist (AI Must Confirm)
-1. อ่าน ISSUE-06.md และ plan/01-conventions.md แล้วยืนยัน Files Allowed whitelist
-2. ISSUE-04 ถูก merge แล้ว — F-02 (Catalog) และ F-03 (Customer Orders) พร้อมใช้งาน
-3. ISSUE-05 ถูก merge แล้ว — F-04 (Operator Acceptance) พร้อมใช้งาน
+1. อ่าน `ISSUE-06.md` และ `plan/01-conventions.md` แล้วยืนยัน Files Allowed whitelist
+2. `ISSUE-04` ถูก merge แล้ว — F-02 (Catalog) และ F-03 (Customer Orders) พร้อมใช้งาน
+3. `ISSUE-05` ถูก merge แล้ว — F-04 (Operator Acceptance) พร้อมใช้งาน
 4. `npm test` (unit + API integration) ผ่านทั้งหมด ก่อนเริ่ม E2E
 5. Server และ Client รันได้ด้วย `npm run dev`
 
@@ -37,7 +37,7 @@ Implement Playwright E2E tests covering 3 viewports, capture responsive screensh
   - E2E-02: Customer logs in and sees Catalog
   - E2E-03: Customer places an order (2+ items), sees order confirmation
   - E2E-04: Customer views My Orders list — order appears with PENDING status
-  - E2E-05: Customer views order detail — totalAmount correct, items listed
+  - E2E-05: Customer views order detail — `totalAmount` formatted in THB is correct, items listed
 - [ ] **AC-06-02 (E2E-06 to E2E-08):** Operator Happy Path — Desktop 1280px:
   - E2E-06: Operator logs in and sees Order Queue
   - E2E-07: Operator accepts a PENDING order — status changes to ACCEPTED
@@ -68,14 +68,14 @@ Implement Playwright E2E tests covering 3 viewports, capture responsive screensh
 
 ### Deliverable 1 Evidence Checklist
 - [ ] **AC-06-10:** Verify Git timestamp order in `sprint-1-staging`:
-  - ISSUE-01 PR merge timestamp < ISSUE-03 PR merge timestamp ✅
-  - ISSUE-02 PR merge timestamp < ISSUE-03 PR merge timestamp ✅
-- [ ] **AC-06-11:** All AC from ISSUE-01 to ISSUE-05 verified as passing
+  - `ISSUE-01` (`docs/issue-01-product-baseline`) merge timestamp < `ISSUE-03` (`feat/issue-03-scaffold-db-and-auth`) merge timestamp ✅
+  - `ISSUE-02` (`docs/issue-02-sprint1-contracts`) merge timestamp < `ISSUE-03` (`feat/issue-03-scaffold-db-and-auth`) merge timestamp ✅
+- [ ] **AC-06-11:** All AC from `ISSUE-01` to `ISSUE-05` verified as passing
 - [ ] **AC-06-12:** `npm test` exits with code 0 (all unit + API integration tests pass)
 - [ ] **AC-06-13:** Playwright `npm run test:e2e` exits with code 0 (all E2E tests pass)
 - [ ] **AC-06-14:** Release PR created: `sprint-1-staging` → `main` with:
   - Full evidence: test output screenshots, responsive screenshots
-  - Link to all 6 Sprint 1 PRs
+  - Link to all Sprint 1 PRs (`ISSUE-00` to `ISSUE-06`)
   - Deliverable 1 submission checklist completed
 
 ---
@@ -123,5 +123,5 @@ README.md                                      ← แก้ไข (เพิ่
 1. **Stability:** ไม่มี hardcoded sleep — E2E tests ต้อง stable ใน CI
 2. **3 Viewports:** ทุก spec ต้อง run บน Desktop + Tablet + Mobile ใน `playwright.config.ts`
 3. **Screenshot naming:** ชื่อ screenshot ต้องชัดเจน: `{viewport}-{pagename}-{step}.png`
-4. **Timestamp verification:** Git log ต้องแสดงว่า ISSUE-01, ISSUE-02 merge ก่อน ISSUE-03
+4. **Timestamp verification:** Git log ต้องแสดงว่า `ISSUE-01` และ `ISSUE-02` merge ก่อน `ISSUE-03`
 5. **README accuracy:** ทดสอบ README instructions จริงๆ บน machine ใหม่ก่อน submit

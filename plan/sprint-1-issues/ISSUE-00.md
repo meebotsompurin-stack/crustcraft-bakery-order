@@ -1,4 +1,4 @@
-# Issue #00 — Phase 0 Repository Initialization & 3-Sprint Master Plan
+# ISSUE-00 — Phase 0 Repository Initialization & 3-Sprint Master Plan
 
 ---
 
@@ -24,13 +24,12 @@
 ## Acceptance Criteria
 
 - [ ] **AC-00-01:** Repository root มี `.gitignore` ครอบคลุม node_modules, SQLite files (`*.db`, `*.db-wal`), build artifacts, และ environment files
-- [ ] **AC-00-02:** `README.md` ระบุข้อมูลสมาชิกทีม (Purin Mebotsom, Saksorn Buranatananun), Theme 4 context, Tech Stack (Express + React + Prisma SQLite + Tailwind), และ Sprint Roadmap ชัดเจน
-- [ ] **AC-00-03:** `plan/00-project-state.md` บันทึกสถานะระบบเริ่มต้น, Tech Stack lock, Domain Models (User, BakeryItem, Order, OrderItem), และ Issue Status Tracker
-- [ ] **AC-00-04:** `plan/01-conventions.md` กำหนด Document Templates (`specification.md`, `api-spec.md`, `ui-spec.md`, `tests.md`), API Namespace conventions, และ Error Response Envelope
+- [ ] **AC-00-02:** `README.md` ระบุข้อมูลสมาชิกทีม (Purin Mebotsom, Saksorn Buranatananun), Theme 4 context, Tech Stack (Express + React + Prisma SQLite/PostgreSQL + Tailwind), และ Sprint Roadmap ชัดเจน
+- [ ] **AC-00-03:** `plan/00-project-state.md` บันทึกสถานะระบบเริ่มต้น, Tech Stack lock, Domain Models (User, BakeryItem, Order, OrderItem พร้อมชนิดเงินจำนวนเต็มสตางค์ `Int` และความสัมพันธ์ `isAvailable` vs. `stockQuantity`), ADRs (รวมถึงแผนเก็บข้อมูลถาวรบน GCP ตาม Spec 5.1, Shared Operator Queue, และ JWT Cookie + Expiry/Logout), และ Issue Status Tracker
+- [ ] **AC-00-04:** `plan/01-conventions.md` กำหนดตารางตำแหน่งไฟล์เอกสาร (SRS, System SDS, Role/Permission Matrix, Feature SDS), Document Templates (`specification.md`, `api-spec.md`, `ui-spec.md`, `tests.md`), API Namespace conventions, Error Response Envelope, และ TypeScript Monetary Type (`Satang` = `Int`)
 - [ ] **AC-00-05:** `plan/02-feature-coverage.md` บันทึก Master Feature Registry (F-01 ถึง F-09) พร้อมรายละเอียดความต้องการสำหรับ Sprint 1
 - [ ] **AC-00-06:** `plan/03-macro-plan.md` กำหนดแผนงานแม่บท 3 Sprints, Timeline ส่งงาน Deliverables 1-3 และ Labs 5-7
-- [ ] **AC-00-07:** โฟลเดอร์ `plan/sprint-1-issues/` มี `INDEX.md` และเอกสารสเปกราย Issue ตั้งแต่ `ISSUE-00.md` ถึง `ISSUE-06.md` ครบถ้วน พร้อม Wave execution, Conflict matrix, และ Test ID allocations
-- [ ] **AC-00-08:** `knowledge/` ใน workspace root ได้รับการปรับปรุงให้รองรับ CrustCraft domain rules (Server-side pricing, Stock atomicity, Ownership isolation)
+- [ ] **AC-00-07:** โฟลเดอร์ `plan/sprint-1-issues/` มี `INDEX.md` และเอกสารสเปกราย Issue ตั้งแต่ `ISSUE-00.md` ถึง `ISSUE-06.md` ครบถ้วน พร้อม Wave execution, Conflict matrix, และ Test ID allocations (อ้างอิงด้วย `ISSUE-XX` หรือชื่อ branch)
 
 ---
 
@@ -56,7 +55,7 @@ plan/sprint-1-issues/ISSUE-06.md
 ## Out of Scope
 
 - ❌ ห้ามสร้างหรือแก้ไขไฟล์โค้ดใน `server/`, `client/`, `prisma/`, `e2e/`
-- ❌ ห้ามสร้างไฟล์สเปกใน `docs/` (งานของ ISSUE-01 และ ISSUE-02)
+- ❌ ห้ามสร้างไฟล์สเปกใน `docs/` (งานของ `ISSUE-01` และ `ISSUE-02`)
 - ❌ ห้ามแก้ไขไฟล์หลักสูตรใน `Docs/`
 
 ---
