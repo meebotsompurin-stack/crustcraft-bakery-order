@@ -11,6 +11,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { CatalogPage } from './pages/CatalogPage';
+import { OrderPage } from './pages/OrderPage';
+import { MyOrdersPage } from './pages/MyOrdersPage';
+import { OrderDetailPage } from './pages/OrderDetailPage';
 
 export const formatTHB = (satang: number): string =>
   `฿${(satang / 100).toFixed(2)}`;
@@ -122,10 +126,7 @@ export const App: React.FC = () => {
                 path="/catalog"
                 element={
                   <ProtectedRoute allowedRoles={['CUSTOMER', 'OPERATOR']}>
-                    <PortalPlaceholder
-                      title="Artisan Bakery Catalog"
-                      subtitle="Catalog view initialized (implemented in ISSUE-04)."
-                    />
+                    <CatalogPage />
                   </ProtectedRoute>
                 }
               />
@@ -134,10 +135,7 @@ export const App: React.FC = () => {
                 path="/orders/new"
                 element={
                   <ProtectedRoute allowedRoles={['CUSTOMER']}>
-                    <PortalPlaceholder
-                      title="New Pre-Order"
-                      subtitle="Customer pre-order creation initialized (implemented in ISSUE-04)."
-                    />
+                    <OrderPage />
                   </ProtectedRoute>
                 }
               />
@@ -146,10 +144,21 @@ export const App: React.FC = () => {
                 path="/orders"
                 element={
                   <ProtectedRoute allowedRoles={['CUSTOMER']}>
-                    <PortalPlaceholder
-                      title="My Pre-Orders"
-                      subtitle="Customer order history initialized (implemented in ISSUE-04)."
-                    />
+                    <MyOrdersPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/my-orders"
+                element={<Navigate to="/orders" replace />}
+              />
+
+              <Route
+                path="/orders/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['CUSTOMER']}>
+                    <OrderDetailPage />
                   </ProtectedRoute>
                 }
               />
