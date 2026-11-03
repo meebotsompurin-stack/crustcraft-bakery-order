@@ -1,4 +1,7 @@
 import { app } from './app';
+import { getJwtSecret } from './services/auth.service';
+
+getJwtSecret();
 
 const PORT = Number(process.env.PORT) || 3001;
 

@@ -1,10 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
+
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'crustcraft-unit-test-jwt-secret-2026';
+}
+
 import {
   hashPassword,
   verifyPassword,
   signToken,
   verifyToken,
+  getJwtSecret,
 } from '../../services/auth.service';
 import { authenticate } from '../../middleware/authenticate.middleware';
 
@@ -36,6 +42,16 @@ describe('F-01 Authentication Unit Tests (AUTH-08, AUTH-10)', () => {
       const decoded = verifyToken(token);
       expect(decoded.userId).toBe(payload.userId);
       expect(decoded.role).toBe(payload.role);
+    });
+
+    it('throws an error if JWT_SECRET environment variable is missing', () => {
+      const originalSecret = process.env.JWT_SECRET;
+      delete process.env.JWT_SECRET;
+      try {
+        expect(() => getJwtSecret()).toThrow(/JWT_SECRET/);
+      } finally {
+        process.env.JWT_SECRET = originalSecret;
+      }
     });
 
     it('extracts valid JWT from req.cookies.token (primary channel) and attaches req.user', () => {

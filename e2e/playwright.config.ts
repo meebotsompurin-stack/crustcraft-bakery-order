@@ -41,6 +41,10 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: '..',
       timeout: 30000,
+      env: {
+        DATABASE_URL: process.env.DATABASE_URL || 'file:./dev.db',
+        JWT_SECRET: process.env.JWT_SECRET || 'crustcraft-e2e-jwt-secret-2026',
+      },
     },
     {
       command: 'npm run dev:client',

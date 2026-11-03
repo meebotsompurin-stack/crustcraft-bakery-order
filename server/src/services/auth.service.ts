@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/db';
 
 export type Role = 'CUSTOMER' | 'OPERATOR';
@@ -35,9 +36,17 @@ export class AppError extends Error {
   }
 }
 
-export const JWT_SECRET =
-  process.env.JWT_SECRET || 'crustcraft-sprint1-secret-key-2026';
 const SALT_ROUNDS = 10;
+
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.trim().length === 0) {
+    throw new Error(
+      'JWT_SECRET environment variable is required and must not be empty'
+    );
+  }
+  return secret;
+}
 
 export async function hashPassword(plaintext: string): Promise<string> {
   return bcrypt.hash(plaintext, SALT_ROUNDS);
@@ -53,13 +62,13 @@ export async function verifyPassword(
 export function signToken(payload: JwtUserPayload): string {
   return jwt.sign(
     { userId: payload.userId, role: payload.role },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '24h' }
   );
 }
 
 export function verifyToken(token: string): JwtUserPayload {
-  const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+  const decoded = jwt.verify(token, getJwtSecret()) as jwt.JwtPayload;
   if (
     !decoded ||
     typeof decoded.userId !== 'string' ||
@@ -93,11 +102,9 @@ export async function registerUser(input: {
   name: string;
   email: string;
   password: string;
-  role?: Role;
 }): Promise<UserResponse> {
   const normalizedEmail = input.email.trim().toLowerCase();
   const trimmedName = input.name.trim();
-  const role: Role = input.role ?? 'CUSTOMER';
 
   const existing = await prisma.user.findUnique({
     where: { email: normalizedEmail },
@@ -111,16 +118,28 @@ export async function registerUser(input: {
 
   const passwordHash = await hashPassword(input.password);
 
-  const created = await prisma.user.create({
-    data: {
-      name: trimmedName,
-      email: normalizedEmail,
-      passwordHash,
-      role,
-    },
-  });
+  try {
+    const created = await prisma.user.create({
+      data: {
+        name: trimmedName,
+        email: normalizedEmail,
+        passwordHash,
+        role: 'CUSTOMER',
+      },
+    });
 
-  return formatUserResponse(created);
+    return formatUserResponse(created);
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === 'P2002'
+    ) {
+      throw new AppError(409, 'CONFLICT', 'Email already in use', [
+        { field: 'email', issue: 'Email address is already registered' },
+      ]);
+    }
+    throw err;
+  }
 }
 
 export async function loginUser(input: {

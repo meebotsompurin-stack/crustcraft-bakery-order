@@ -46,7 +46,6 @@ export async function registerUserApi(input: {
   name: string;
   email: string;
   password: string;
-  role?: Role;
 }): Promise<{ user: UserResponse }> {
   return requestJson<{ user: UserResponse }>('/auth/register', {
     method: 'POST',

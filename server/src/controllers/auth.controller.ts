@@ -4,7 +4,6 @@ import {
   loginUser,
   getUserById,
   AppError,
-  type Role,
 } from '../services/auth.service';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,23 +37,18 @@ export async function registerController(
       });
     }
 
-    let role: Role = 'CUSTOMER';
-    if (rawRole !== undefined) {
-      if (rawRole !== 'CUSTOMER' && rawRole !== 'OPERATOR') {
-        details.push({
-          field: 'role',
-          issue: 'Role must be either CUSTOMER or OPERATOR',
-        });
-      } else {
-        role = rawRole;
-      }
+    if (rawRole !== undefined && rawRole !== 'CUSTOMER') {
+      details.push({
+        field: 'role',
+        issue: 'Public registration only permits CUSTOMER role',
+      });
     }
 
     if (details.length > 0) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Invalid registration data', details);
     }
 
-    const user = await registerUser({ name, email, password, role });
+    const user = await registerUser({ name, email, password });
     res.status(201).json({ user });
   } catch (err) {
     next(err);

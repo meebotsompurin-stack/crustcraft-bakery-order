@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   type UserResponse,
-  type Role,
   loginUserApi,
   registerUserApi,
   logoutUserApi,
@@ -16,7 +15,6 @@ interface AuthContextValue {
     name: string;
     email: string;
     password: string;
-    role?: Role;
   }) => Promise<UserResponse>;
   logout: () => Promise<void>;
 }
@@ -63,7 +61,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     name: string;
     email: string;
     password: string;
-    role?: Role;
   }): Promise<UserResponse> => {
     const res = await registerUserApi(input);
     return res.user;

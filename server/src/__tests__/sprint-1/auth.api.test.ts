@@ -1,21 +1,40 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { execSync } from 'child_process';
+import path from 'path';
+
+process.env.DATABASE_URL = 'file:./test.db';
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'crustcraft-api-test-jwt-secret-2026';
+}
+
 import { app } from '../../app';
 import { prisma } from '../../lib/db';
-import { hashPassword, JWT_SECRET } from '../../services/auth.service';
+import { hashPassword, getJwtSecret } from '../../services/auth.service';
 
 describe('F-01 Authentication & RBAC API Integration Tests (AUTH-01 to AUTH-07, AUTH-09)', () => {
-  const testCustomerEmail = `auth.customer.${Date.now()}@test.com`;
-  const testOperatorEmail = `auth.operator.${Date.now()}@test.com`;
+  const testRunId = Date.now();
+  const testCustomerEmail = `auth.customer.${testRunId}@test.com`;
+  const testOperatorEmail = `auth.operator.${testRunId}@test.com`;
+  const testPrivilegeEscalationEmail = `auth.escalation.${testRunId}@test.com`;
+  const ownedTestEmails = [
+    testCustomerEmail,
+    testOperatorEmail,
+    testPrivilegeEscalationEmail,
+  ];
 
   beforeAll(async () => {
-    await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
+    const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
+    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+      env: { ...process.env, DATABASE_URL: 'file:./test.db' },
+      stdio: 'pipe',
+    });
+
     await prisma.user.deleteMany({
       where: {
         email: {
-          in: [testCustomerEmail, testOperatorEmail, 'somsak@test.com'],
+          in: ownedTestEmails,
         },
       },
     });
@@ -37,14 +56,14 @@ describe('F-01 Authentication & RBAC API Integration Tests (AUTH-01 to AUTH-07, 
     await prisma.user.deleteMany({
       where: {
         email: {
-          in: [testCustomerEmail, testOperatorEmail, 'somsak@test.com'],
+          in: ownedTestEmails,
         },
       },
     });
     await prisma.$disconnect();
   });
 
-  it('AUTH-01: POST /api/auth/register creates User and returns 201 with user data (excluding passwordHash)', async () => {
+  it('AUTH-01: POST /api/auth/register creates User with CUSTOMER role and returns 201 with user data (excluding passwordHash)', async () => {
     const res = await request(app).post('/api/auth/register').send({
       name: 'SomsakJaidee',
       email: testCustomerEmail,
@@ -64,7 +83,17 @@ describe('F-01 Authentication & RBAC API Integration Tests (AUTH-01 to AUTH-07, 
       where: { email: testCustomerEmail },
     });
     expect(dbUser).not.toBeNull();
+    expect(dbUser?.role).toBe('CUSTOMER');
     expect(dbUser?.passwordHash).not.toBe('password123');
+
+    const escalationRes = await request(app).post('/api/auth/register').send({
+      name: 'Escalation Attempt',
+      email: testPrivilegeEscalationEmail,
+      password: 'password123',
+      role: 'OPERATOR',
+    });
+    expect(escalationRes.status).toBe(400);
+    expect(escalationRes.body.error.code).toBe('VALIDATION_ERROR');
   });
 
   it('AUTH-02: POST /api/auth/register with duplicate email returns 409 CONFLICT with standard error envelope', async () => {
@@ -159,7 +188,7 @@ describe('F-01 Authentication & RBAC API Integration Tests (AUTH-01 to AUTH-07, 
 
     const expiredToken = jwt.sign(
       { userId: 'clx1expired', role: 'CUSTOMER' },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '-10s' }
     );
 
