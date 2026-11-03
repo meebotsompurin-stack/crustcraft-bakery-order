@@ -1,0 +1,60 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("CUSTOMER") // "CUSTOMER" | "OPERATOR"
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model BakeryItem {
+  id            String      @id @default(cuid())
+  name          String      @unique
+  description   String
+  price         Int         // Authoritative unit price in integer satang (100 satang = 1.00 THB)
+  stockQuantity Int         // Physical batch inventory remaining (>= 0)
+  isAvailable   Boolean     @default(true) // Operator catalog visibility flag (BR-05)
+  category      String      // "Pastry" | "Bread" | "Sweet Bread" | "Tart"
+  orderItems    OrderItem[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  customerId  String
+  customer    User        @relation(fields: [customerId], references: [id])
+  status      String      @default("PENDING") // Sprint 1: "PENDING" | "ACCEPTED"
+  totalAmount Int         // Server-calculated total in integer satang (BR-01)
+  pickupNote  String?
+  items       OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([customerId])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id               String     @id @default(cuid())
+  orderId          String
+  order            Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  bakeryItemId     String
+  bakeryItem       BakeryItem @relation(fields: [bakeryItemId], references: [id])
+  quantity         Int        // Number of units ordered (> 0)
+  unitPriceAtOrder Int        // Snapshot of BakeryItem.price in integer satang at order time (BR-02)
+
+  @@index([orderId])
+  @@index([bakeryItemId])
+}
