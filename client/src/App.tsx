@@ -11,6 +11,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { OperatorOrderQueuePage } from './pages/OperatorOrderQueuePage';
+import { OperatorOrderDetailPage } from './pages/OperatorOrderDetailPage';
 
 export const formatTHB = (satang: number): string =>
   `฿${(satang / 100).toFixed(2)}`;
@@ -158,10 +160,15 @@ export const App: React.FC = () => {
                 path="/operator/orders"
                 element={
                   <ProtectedRoute allowedRoles={['OPERATOR']}>
-                    <PortalPlaceholder
-                      title="Operator Incoming Order Queue"
-                      subtitle="Shared operator order queue initialized (implemented in ISSUE-05)."
-                    />
+                    <OperatorOrderQueuePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/operator/orders/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['OPERATOR']}>
+                    <OperatorOrderDetailPage />
                   </ProtectedRoute>
                 }
               />

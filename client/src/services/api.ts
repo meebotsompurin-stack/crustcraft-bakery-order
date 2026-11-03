@@ -75,3 +75,61 @@ export async function getCurrentUserApi(): Promise<{ user: UserResponse }> {
     method: 'GET',
   });
 }
+
+export type OrderStatus = 'PENDING' | 'ACCEPTED';
+
+export interface OrderItemResponse {
+  id: string;
+  orderId?: string;
+  bakeryItemId: string;
+  bakeryItem?: {
+    id: string;
+    name: string;
+    category?: string;
+  };
+  quantity: number;
+  unitPriceAtOrder: number; // satang
+}
+
+export interface OrderResponse {
+  id: string;
+  customerId: string;
+  customer?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  status: OrderStatus;
+  totalAmount: number; // satang
+  pickupNote?: string | null;
+  items: OrderItemResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getOperatorOrdersApi(): Promise<{ orders: OrderResponse[] }> {
+  return requestJson<{ orders: OrderResponse[] }>('/operator/orders', {
+    method: 'GET',
+  });
+}
+
+export async function getOperatorOrderByIdApi(
+  orderId: string
+): Promise<{ order: OrderResponse }> {
+  return requestJson<{ order: OrderResponse }>(`/operator/orders/${orderId}`, {
+    method: 'GET',
+  });
+}
+
+export async function updateOperatorOrderStatusApi(
+  orderId: string,
+  status: OrderStatus
+): Promise<{ order: OrderResponse }> {
+  return requestJson<{ order: OrderResponse }>(
+    `/operator/orders/${orderId}/status`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }
+  );
+}

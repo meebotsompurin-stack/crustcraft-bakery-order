@@ -2,6 +2,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { authRouter } from './routes/auth.routes';
+import { operatorRouter } from './routes/operator.routes';
 import { AppError } from './services/auth.service';
 
 export const app = express();
@@ -20,6 +21,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/operator', operatorRouter);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
