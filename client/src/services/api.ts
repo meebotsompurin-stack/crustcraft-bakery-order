@@ -80,6 +80,8 @@ export async function getCurrentUserApi(): Promise<{ user: UserResponse }> {
 // F-02 Catalog & F-03 Customer Pre-Order API Clients
 // -------------------------------------------------------------
 
+export type OrderStatus = 'PENDING' | 'ACCEPTED';
+
 export interface BakeryItemDto {
   id: string;
   name: string;
@@ -94,6 +96,7 @@ export interface BakeryItemDto {
 
 export interface OrderItemDto {
   id: string;
+  orderId?: string;
   bakeryItemId: string;
   bakeryItem?: {
     id: string;
@@ -104,6 +107,8 @@ export interface OrderItemDto {
   unitPriceAtOrder: number; // integer satang
 }
 
+export type OrderItemResponse = OrderItemDto;
+
 export interface OrderDto {
   id: string;
   customerId: string;
@@ -112,13 +117,15 @@ export interface OrderDto {
     name: string;
     email: string;
   };
-  status: string;
+  status: OrderStatus;
   totalAmount: number; // integer satang
   pickupNote: string | null;
   items: OrderItemDto[];
   createdAt: string;
   updatedAt: string;
 }
+
+export type OrderResponse = OrderDto;
 
 export interface CreateOrderPayload {
   items: Array<{
@@ -163,4 +170,35 @@ export async function getCustomerOrderByIdApi(
   return requestJson<{ order: OrderDto }>(`/customer/orders/${id}`, {
     method: 'GET',
   });
+}
+
+// -------------------------------------------------------------
+// F-04 Operator Order Queue & Acceptance API Clients
+// -------------------------------------------------------------
+
+export async function getOperatorOrdersApi(): Promise<{ orders: OrderResponse[] }> {
+  return requestJson<{ orders: OrderResponse[] }>('/operator/orders', {
+    method: 'GET',
+  });
+}
+
+export async function getOperatorOrderByIdApi(
+  orderId: string
+): Promise<{ order: OrderResponse }> {
+  return requestJson<{ order: OrderResponse }>(`/operator/orders/${orderId}`, {
+    method: 'GET',
+  });
+}
+
+export async function updateOperatorOrderStatusApi(
+  orderId: string,
+  status: OrderStatus
+): Promise<{ order: OrderResponse }> {
+  return requestJson<{ order: OrderResponse }>(
+    `/operator/orders/${orderId}/status`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }
+  );
 }

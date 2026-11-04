@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { authRouter } from './routes/auth.routes';
 import { catalogRouter } from './routes/catalog.routes';
 import { customerRouter } from './routes/customer.routes';
+import { operatorRouter } from './routes/operator.routes';
 import { AppError } from './services/auth.service';
 
 export const app = express();
@@ -24,6 +25,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 app.use('/api/auth', authRouter);
 app.use('/api/catalog', catalogRouter);
 app.use('/api/customer', customerRouter);
+app.use('/api/operator', operatorRouter);
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({
