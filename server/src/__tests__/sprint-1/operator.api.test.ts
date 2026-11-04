@@ -321,6 +321,36 @@ describe('F-04 Operator Order Queue & Acceptance API Tests (OPS-01 to OPS-08)', 
     expect(resNonString.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('Concurrent accepts of the same PENDING order: exactly one 200 and one 409 CONFLICT', async () => {
+    const order = await prisma.order.create({
+      data: {
+        customerId,
+        status: 'PENDING',
+        totalAmount: 8500,
+        items: {
+          create: [
+            { bakeryItemId: testBakeryItemId, quantity: 1, unitPriceAtOrder: 8500 },
+          ],
+        },
+      },
+    });
+
+    try {
+      const send = () =>
+        request(app)
+          .patch(`/api/operator/orders/${order.id}/status`)
+          .set('Authorization', `Bearer ${operatorToken}`)
+          .send({ status: 'ACCEPTED' });
+
+      const results = await Promise.all([send(), send()]);
+      const statuses = results.map((r) => r.status).sort();
+      expect(statuses).toEqual([200, 409]);
+    } finally {
+      await prisma.orderItem.deleteMany({ where: { orderId: order.id } });
+      await prisma.order.deleteMany({ where: { id: order.id } });
+    }
+  });
+
   it('PATCH /api/operator/orders/:id/status for non-existent order returns 404 NOT_FOUND', async () => {
     const res = await request(app)
       .patch('/api/operator/orders/non-existent-order-id/status')

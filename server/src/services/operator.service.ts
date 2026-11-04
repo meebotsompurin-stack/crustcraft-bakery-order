@@ -112,9 +112,23 @@ export async function updateOrderStatus(orderId: string, targetStatus: unknown) 
     );
   }
 
-  const updatedOrder = await prisma.order.update({
-    where: { id: orderId },
+  // Atomic conditional update: only succeeds if the row still has the status we validated,
+  // so concurrent operators cannot both accept the same order (BR-06, BR-07).
+  const result = await prisma.order.updateMany({
+    where: { id: orderId, status: existingOrder.status },
     data: { status: targetStatus },
+  });
+
+  if (result.count === 0) {
+    throw new AppError(
+      409,
+      'CONFLICT',
+      'Order status was changed by another operator; please refresh the queue'
+    );
+  }
+
+  const updatedOrder = await prisma.order.findUniqueOrThrow({
+    where: { id: orderId },
     include: {
       customer: {
         select: {
