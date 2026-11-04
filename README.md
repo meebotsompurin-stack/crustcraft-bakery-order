@@ -51,7 +51,57 @@ crustcraft-bakery-order/
 
 ## Setup Guide
 
-> ⚠️ **Setup instructions will be populated in ISSUE-06 after project scaffold is complete.**
+### 1. Prerequisites
+- **Node.js**: `v20.x` or `v22.x` (LTS recommended)
+- **npm**: `v10.x` or newer
+- **Browser (for E2E tests)**: Chromium (installed via `npx playwright install chromium`)
+
+### 2. Installation
+Clone the repository and install dependencies at the workspace root:
+```bash
+cd crustcraft-bakery-order
+npm install
+```
+
+### 3. Database Migration & Seeding
+Initialize the SQLite development database and load the initial seed data (Operator, Customers, and Bakery items):
+```bash
+# Run database migrations
+npm run db:migrate
+
+# Seed default test users and catalog items
+npm run seed
+```
+
+### 4. Running Development Servers
+Start both backend (Express on port `3001`) and frontend (Vite React on port `5173`) concurrently:
+```bash
+npm run dev
+```
+Open your browser at `http://localhost:5173`.
+
+### 5. Running Automated Tests
+- **Unit & API Integration Tests (Vitest + Supertest):**
+  ```bash
+  npm test
+  ```
+- **End-to-End Tests (Playwright across Desktop 1280px, Tablet 768px, and Mobile 375px):**
+  ```bash
+  npm run test:e2e
+  ```
+- **Production Build Check:**
+  ```bash
+  npm run build
+  ```
+
+### 6. Default Test Credentials
+The database seed creates the following default accounts for development and testing:
+
+| Role | Email | Password | Allowed Access |
+|---|---|---|---|
+| **Operator** | `operator@crustcraft.com` | `operator123` | Incoming Order Queue (`/operator/orders`), Order Details, Acceptance |
+| **Customer 1** | `customer1@test.com` | `customer123` | Bakery Catalog (`/catalog`), Pre-Order Form (`/orders/new`), My Orders (`/orders`) |
+| **Customer 2** | `customer2@test.com` | `customer123` | Customer features (isolated order history) |
 
 ## License
 
