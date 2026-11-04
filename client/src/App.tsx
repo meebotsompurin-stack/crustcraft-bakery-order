@@ -100,18 +100,6 @@ const TopNavbar: React.FC = () => {
   );
 };
 
-const PortalPlaceholder: React.FC<{ title: string; subtitle: string }> = ({
-  title,
-  subtitle,
-}) => (
-  <div className="max-w-7xl mx-auto px-4 md:px-8 py-10">
-    <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center">
-      <h2 className="text-xl font-bold text-stone-900">{title}</h2>
-      <p className="text-sm text-stone-600 mt-2">{subtitle}</p>
-    </div>
-  </div>
-);
-
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
