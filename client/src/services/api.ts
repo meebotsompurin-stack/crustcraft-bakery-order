@@ -75,3 +75,92 @@ export async function getCurrentUserApi(): Promise<{ user: UserResponse }> {
     method: 'GET',
   });
 }
+
+// -------------------------------------------------------------
+// F-02 Catalog & F-03 Customer Pre-Order API Clients
+// -------------------------------------------------------------
+
+export interface BakeryItemDto {
+  id: string;
+  name: string;
+  description: string;
+  price: number; // integer satang
+  stockQuantity: number;
+  isAvailable: boolean;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderItemDto {
+  id: string;
+  bakeryItemId: string;
+  bakeryItem?: {
+    id: string;
+    name: string;
+    category: string;
+  };
+  quantity: number;
+  unitPriceAtOrder: number; // integer satang
+}
+
+export interface OrderDto {
+  id: string;
+  customerId: string;
+  customer?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  status: string;
+  totalAmount: number; // integer satang
+  pickupNote: string | null;
+  items: OrderItemDto[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateOrderPayload {
+  items: Array<{
+    bakeryItemId: string;
+    quantity: number;
+  }>;
+  pickupNote?: string;
+}
+
+export async function getCatalogItemsApi(): Promise<{ items: BakeryItemDto[] }> {
+  return requestJson<{ items: BakeryItemDto[] }>('/catalog', {
+    method: 'GET',
+  });
+}
+
+export async function getCatalogItemByIdApi(
+  id: string
+): Promise<{ item: BakeryItemDto }> {
+  return requestJson<{ item: BakeryItemDto }>(`/catalog/${id}`, {
+    method: 'GET',
+  });
+}
+
+export async function createCustomerOrderApi(
+  payload: CreateOrderPayload
+): Promise<{ order: OrderDto }> {
+  return requestJson<{ order: OrderDto }>('/customer/orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getCustomerOrdersApi(): Promise<{ orders: OrderDto[] }> {
+  return requestJson<{ orders: OrderDto[] }>('/customer/orders', {
+    method: 'GET',
+  });
+}
+
+export async function getCustomerOrderByIdApi(
+  id: string
+): Promise<{ order: OrderDto }> {
+  return requestJson<{ order: OrderDto }>(`/customer/orders/${id}`, {
+    method: 'GET',
+  });
+}
