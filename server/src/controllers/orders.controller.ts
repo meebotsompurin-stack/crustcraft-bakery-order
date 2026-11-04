@@ -12,7 +12,19 @@ export async function createOrderHandler(
 ): Promise<void> {
   try {
     const customerId = req.user!.userId;
-    const { items, pickupNote } = req.body || {};
+    const body = req.body;
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Request body must be a valid JSON object.',
+        },
+      });
+      return;
+    }
+
+    const { items, pickupNote } = body;
 
     const order = await createCustomerOrder({
       customerId,

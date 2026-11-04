@@ -96,7 +96,7 @@ export async function createCustomerOrder(
 ): Promise<OrderDto> {
   const { customerId, items, pickupNote } = input;
 
-  // 1. Validation: non-empty items and quantity > 0
+  // 1. Validation: non-empty items
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new AppError(
       400,
@@ -106,15 +106,67 @@ export async function createCustomerOrder(
     );
   }
 
-  for (const item of items) {
-    if (!item.bakeryItemId || typeof item.bakeryItemId !== 'string') {
+  // 2. Validate pickupNote type and max length (Fix 3)
+  if (pickupNote !== undefined && pickupNote !== null) {
+    if (typeof pickupNote !== 'string') {
       throw new AppError(
         400,
         'VALIDATION_ERROR',
-        'Each item must have a valid bakeryItemId.',
-        [{ field: 'bakeryItemId', issue: 'Missing or invalid bakeryItemId' }]
+        'Pickup note must be a string.',
+        [{ field: 'pickupNote', issue: 'Must be a string' }]
       );
     }
+    if (pickupNote.trim().length > 500) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Pickup note cannot exceed 500 characters.',
+        [{ field: 'pickupNote', issue: 'Cannot exceed 500 characters' }]
+      );
+    }
+  }
+
+  // 3. Validate element structure, trimmed non-empty string bakeryItemId, and positive integer quantity (Fix 1 & Fix 2)
+  const seenItemIds = new Set<string>();
+
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index];
+
+    // Fix 1: Ensure each element is a valid non-null plain object
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        `Item at index ${index} must be a valid object.`,
+        [{ field: `items[${index}]`, issue: 'Must be a non-null plain object' }]
+      );
+    }
+
+    // Fix 2: Validate non-empty trimmed string bakeryItemId
+    if (
+      typeof item.bakeryItemId !== 'string' ||
+      item.bakeryItemId.trim().length === 0
+    ) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        `Item at index ${index} must have a valid non-empty bakeryItemId.`,
+        [{ field: `items[${index}].bakeryItemId`, issue: 'Missing or empty bakeryItemId' }]
+      );
+    }
+
+    const trimmedItemId = item.bakeryItemId.trim();
+
+    // Fix 2: Enforce uniqueness across items array (reject duplicate bakeryItemId)
+    if (seenItemIds.has(trimmedItemId)) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        `Duplicate bakeryItemId '${trimmedItemId}' entries are not allowed in a single order.`,
+        [{ field: `items[${index}].bakeryItemId`, issue: 'Duplicate bakeryItemId entries are not allowed in a single order' }]
+      );
+    }
+    seenItemIds.add(trimmedItemId);
 
     if (
       typeof item.quantity !== 'number' ||
@@ -125,22 +177,28 @@ export async function createCustomerOrder(
         400,
         'VALIDATION_ERROR',
         'Quantity must be an integer greater than 0.',
-        [{ field: 'quantity', issue: 'Must be an integer greater than 0' }]
+        [{ field: `items[${index}].quantity`, issue: 'Must be an integer greater than 0' }]
       );
     }
   }
 
+  // Normalized items with trimmed IDs
+  const normalizedItems = items.map((i) => ({
+    bakeryItemId: i.bakeryItemId.trim(),
+    quantity: i.quantity,
+  }));
+
   // Execute atomic transactional checkout
   const createdOrder = await prisma.$transaction(async (tx) => {
-    const itemIds = items.map((i) => i.bakeryItemId);
+    const itemIds = normalizedItems.map((i) => i.bakeryItemId);
     const dbItems = await tx.bakeryItem.findMany({
       where: { id: { in: itemIds } },
     });
 
     const dbItemsMap = new Map(dbItems.map((item) => [item.id, item]));
 
-    // Check existence
-    for (const item of items) {
+    // Check existence, availability, and initial stock sufficiency
+    for (const item of normalizedItems) {
       const dbItem = dbItemsMap.get(item.bakeryItemId);
       if (!dbItem) {
         throw new AppError(
@@ -169,20 +227,31 @@ export async function createCustomerOrder(
       }
     }
 
-    // Decrement stock for all items
-    for (const item of items) {
+    // Fix 4: Atomic stock decrement with conditional updateMany & concurrency guard
+    for (const item of normalizedItems) {
       const dbItem = dbItemsMap.get(item.bakeryItemId)!;
-      await tx.bakeryItem.update({
-        where: { id: dbItem.id },
+      const deducted = await tx.bakeryItem.updateMany({
+        where: {
+          id: item.bakeryItemId,
+          isAvailable: true,
+          stockQuantity: { gte: item.quantity },
+        },
         data: {
-          stockQuantity: dbItem.stockQuantity - item.quantity,
-          // BR-05: isAvailable is NOT automatically changed to false
+          stockQuantity: { decrement: item.quantity },
         },
       });
+
+      if (deducted.count === 0) {
+        throw new AppError(
+          409,
+          'CONFLICT',
+          `Insufficient stock or item became unavailable for '${dbItem.name}' during checkout.`
+        );
+      }
     }
 
     // Calculate authoritative totals and price snapshots
-    const calculationInputs: CalculationItemInput[] = items.map((item) => ({
+    const calculationInputs: CalculationItemInput[] = normalizedItems.map((item) => ({
       bakeryItemId: item.bakeryItemId,
       quantity: item.quantity,
       authoritativePrice: dbItemsMap.get(item.bakeryItemId)!.price,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCatalogItemsApi, type BakeryItemDto } from '../services/api';
 import { BakeryItemCard } from '../components/BakeryItemCard';
@@ -11,36 +11,24 @@ export const CatalogPage: React.FC = () => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadCatalog() {
-      try {
-        setIsLoading(true);
-        setErrorMessage(null);
-        const data = await getCatalogItemsApi();
-        if (isMounted) {
-          setItems(data.items || []);
-        }
-      } catch (err: unknown) {
-        if (isMounted) {
-          setErrorMessage(
-            err instanceof Error ? err.message : 'Failed to load catalog items'
-          );
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
+  const loadCatalog = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage(null);
+      const data = await getCatalogItemsApi();
+      setItems(data.items || []);
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Failed to load catalog items'
+      );
+    } finally {
+      setIsLoading(false);
     }
-
-    loadCatalog();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
 
   const categories = ['ALL', ...Array.from(new Set(items.map((i) => i.category)))];
 
@@ -105,8 +93,8 @@ export const CatalogPage: React.FC = () => {
           <p className="text-sm font-semibold">{errorMessage}</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
-            className="mt-3 px-4 py-1.5 rounded-lg bg-rose-700 text-white text-xs font-semibold"
+            onClick={loadCatalog}
+            className="mt-3 px-4 py-1.5 rounded-lg bg-rose-700 text-white text-xs font-semibold hover:bg-rose-800 transition-colors"
           >
             Retry Loading
           </button>

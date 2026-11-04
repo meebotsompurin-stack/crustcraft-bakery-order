@@ -259,6 +259,91 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
       expect(negativeQtyRes.body.error.code).toBe('VALIDATION_ERROR');
     });
 
+    it('ORD-06 regression: returns 400 VALIDATION_ERROR when items array contains duplicate bakeryItemId entries and does not deduct stock', async () => {
+      const stockABefore = (await prisma.bakeryItem.findUnique({ where: { id: itemInStockA } }))?.stockQuantity ?? 0;
+
+      const duplicatePayload = {
+        items: [
+          { bakeryItemId: itemInStockA, quantity: 1 },
+          { bakeryItemId: itemInStockA, quantity: 2 },
+        ],
+      };
+
+      const res = await request(app)
+        .post('/api/customer/orders')
+        .set('Authorization', `Bearer ${customer1Token}`)
+        .send(duplicatePayload);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(res.body.error.message).toContain('Duplicate bakeryItemId');
+
+      // Verify stock was NOT deducted
+      const stockAAfter = (await prisma.bakeryItem.findUnique({ where: { id: itemInStockA } }))?.stockQuantity;
+      expect(stockAAfter).toBe(stockABefore);
+    });
+
+    it('ORD-06 regression: returns 400 VALIDATION_ERROR when item element is null, array, or has empty bakeryItemId', async () => {
+      // Null element in items
+      const nullItemRes = await request(app)
+        .post('/api/customer/orders')
+        .set('Authorization', `Bearer ${customer1Token}`)
+        .send({ items: [null] });
+
+      expect(nullItemRes.status).toBe(400);
+      expect(nullItemRes.body.error.code).toBe('VALIDATION_ERROR');
+      expect(nullItemRes.body.error.message).toContain('must be a valid object');
+
+      // Array element in items
+      const arrayItemRes = await request(app)
+        .post('/api/customer/orders')
+        .set('Authorization', `Bearer ${customer1Token}`)
+        .send({ items: [[]] });
+
+      expect(arrayItemRes.status).toBe(400);
+      expect(arrayItemRes.body.error.code).toBe('VALIDATION_ERROR');
+
+      // Empty string bakeryItemId
+      const emptyIdRes = await request(app)
+        .post('/api/customer/orders')
+        .set('Authorization', `Bearer ${customer1Token}`)
+        .send({
+          items: [{ bakeryItemId: '   ', quantity: 1 }],
+        });
+
+      expect(emptyIdRes.status).toBe(400);
+      expect(emptyIdRes.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('ORD-06 regression: returns 400 VALIDATION_ERROR when pickupNote is non-string or exceeds 500 characters', async () => {
+      // Non-string pickupNote
+      const nonStringNoteRes = await request(app)
+        .post('/api/customer/orders')
+        .set('Authorization', `Bearer ${customer1Token}`)
+        .send({
+          items: [{ bakeryItemId: itemInStockA, quantity: 1 }],
+          pickupNote: 12345,
+        });
+
+      expect(nonStringNoteRes.status).toBe(400);
+      expect(nonStringNoteRes.body.error.code).toBe('VALIDATION_ERROR');
+      expect(nonStringNoteRes.body.error.message).toContain('Pickup note must be a string');
+
+      // Oversized pickupNote (> 500 characters)
+      const oversizedNote = 'A'.repeat(501);
+      const oversizedNoteRes = await request(app)
+        .post('/api/customer/orders')
+        .set('Authorization', `Bearer ${customer1Token}`)
+        .send({
+          items: [{ bakeryItemId: itemInStockA, quantity: 1 }],
+          pickupNote: oversizedNote,
+        });
+
+      expect(oversizedNoteRes.status).toBe(400);
+      expect(oversizedNoteRes.body.error.code).toBe('VALIDATION_ERROR');
+      expect(oversizedNoteRes.body.error.message).toContain('cannot exceed 500 characters');
+    });
+
     it('ORD-07: returns 409 CONFLICT when attempting to order an item with isAvailable == false', async () => {
       const res = await request(app)
         .post('/api/customer/orders')
