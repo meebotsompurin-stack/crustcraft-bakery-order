@@ -76,22 +76,40 @@ export async function getCurrentUserApi(): Promise<{ user: UserResponse }> {
   });
 }
 
+// -------------------------------------------------------------
+// F-02 Catalog & F-03 Customer Pre-Order API Clients
+// -------------------------------------------------------------
+
 export type OrderStatus = 'PENDING' | 'ACCEPTED';
 
-export interface OrderItemResponse {
+export interface BakeryItemDto {
+  id: string;
+  name: string;
+  description: string;
+  price: number; // integer satang
+  stockQuantity: number;
+  isAvailable: boolean;
+  category: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderItemDto {
   id: string;
   orderId?: string;
   bakeryItemId: string;
   bakeryItem?: {
     id: string;
     name: string;
-    category?: string;
+    category: string;
   };
   quantity: number;
-  unitPriceAtOrder: number; // satang
+  unitPriceAtOrder: number; // integer satang
 }
 
-export interface OrderResponse {
+export type OrderItemResponse = OrderItemDto;
+
+export interface OrderDto {
   id: string;
   customerId: string;
   customer?: {
@@ -100,12 +118,63 @@ export interface OrderResponse {
     email: string;
   };
   status: OrderStatus;
-  totalAmount: number; // satang
-  pickupNote?: string | null;
-  items: OrderItemResponse[];
+  totalAmount: number; // integer satang
+  pickupNote: string | null;
+  items: OrderItemDto[];
   createdAt: string;
   updatedAt: string;
 }
+
+export type OrderResponse = OrderDto;
+
+export interface CreateOrderPayload {
+  items: Array<{
+    bakeryItemId: string;
+    quantity: number;
+  }>;
+  pickupNote?: string;
+}
+
+export async function getCatalogItemsApi(): Promise<{ items: BakeryItemDto[] }> {
+  return requestJson<{ items: BakeryItemDto[] }>('/catalog', {
+    method: 'GET',
+  });
+}
+
+export async function getCatalogItemByIdApi(
+  id: string
+): Promise<{ item: BakeryItemDto }> {
+  return requestJson<{ item: BakeryItemDto }>(`/catalog/${id}`, {
+    method: 'GET',
+  });
+}
+
+export async function createCustomerOrderApi(
+  payload: CreateOrderPayload
+): Promise<{ order: OrderDto }> {
+  return requestJson<{ order: OrderDto }>('/customer/orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getCustomerOrdersApi(): Promise<{ orders: OrderDto[] }> {
+  return requestJson<{ orders: OrderDto[] }>('/customer/orders', {
+    method: 'GET',
+  });
+}
+
+export async function getCustomerOrderByIdApi(
+  id: string
+): Promise<{ order: OrderDto }> {
+  return requestJson<{ order: OrderDto }>(`/customer/orders/${id}`, {
+    method: 'GET',
+  });
+}
+
+// -------------------------------------------------------------
+// F-04 Operator Order Queue & Acceptance API Clients
+// -------------------------------------------------------------
 
 export async function getOperatorOrdersApi(): Promise<{ orders: OrderResponse[] }> {
   return requestJson<{ orders: OrderResponse[] }>('/operator/orders', {
