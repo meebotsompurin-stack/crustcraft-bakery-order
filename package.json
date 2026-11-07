@@ -1,0 +1,33 @@
+{
+  "name": "crustcraft-bakery-order",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CrustCraft Artisan Bakery Pre-Order & Fulfillment System (CPE 334)",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"amber,cyan\" \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "build": "npm run build --workspace=server && npm run build --workspace=client",
+    "test": "npm run test --workspace=server",
+    "test:e2e": "playwright test --config=e2e/playwright.config.ts",
+    "db:migrate": "node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'file:./dev.db';require('child_process').execSync('npx prisma migrate dev --name init --schema=prisma/schema.prisma',{stdio:'inherit'})\"",
+    "seed": "npm run seed --workspace=server"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "concurrently": "^9.0.1",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}
