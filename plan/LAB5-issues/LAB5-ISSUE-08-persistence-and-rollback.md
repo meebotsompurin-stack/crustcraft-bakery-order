@@ -23,7 +23,7 @@
    - **(b) การ Redeploy ทั้งระบบ (Full Pipeline Redeploy / Rollback & Roll-forward):** การ Deploy ทับด้วย Revision ใหม่หรือการทำ Rollback
 2. **ปฏิบัติตามแนวปฏิบัติแนะนำ (Recommended Practice Handout §5):** ทดสอบกระบวนการทำ **Zero-Downtime Manual Rollback (`R-08`)** ผ่าน `workflow_dispatch` ข้ามขั้นตอน CI/Build/Migration (`SKIP CI/BUILD/MIGRATE`) เพื่อสลับ Revision กลับสู่ Release A อย่างรวดเร็ว
 3. **Roll-forward กลับสู่ Release B:** นำระบบกลับสู่สถานะล่าสุดพร้อมรับการตรวจงาน
-4. **รักษาความต่อเนื่องของระบบ (`B1`):** เปิดให้บริการ Cloud Run และ Cloud SQL ต่อเนื่องเพื่อรองรับการตรวจงานและ Lab 6 Partner UAT
+4. **รักษาความต่อเนื่องของระบบ (`B1`):** Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.
 
 ---
 
@@ -56,7 +56,7 @@
   - สั่ง Roll-forward กลับสู่ Release B (ใส่ Commit SHA ของ Release B ในช่อง `image_tag`)
   - ตรวจสอบว่าระบบกลับมาเป็น Release B พร้อมข้อมูลที่สมบูรณ์
 - [ ] **AC-LAB5-08-06 (Continuous Availability Compliance `B1`):**
-  - ยืนยันว่า Cloud Run Service และ Cloud SQL ยังคงรันอยู่ต่อเนื่อง ไม่มีการสั่ง Pause หรือ Teardown
+  - **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
 
 ---
 
@@ -104,6 +104,8 @@ docs/labs/lab-05/deployment.md
 
 ## 6. AI Agent & Secret Safety Rules (Strict Policy)
 
-1. ❌ **ห้ามสั่ง Pause หรือ Teardown Cloud SQL เด็ดขาดหลังเสร็จสิ้นการทดสอบนี้ (`B1`)**
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
+
+1. ❌ **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited. (`B1`)**
 2. ❌ **ห้ามเปิดเผย Password ของบัญชีผู้ใช้หรือ Admin ใน Screenshot หรือเอกสาร Markdown (`S7`)**
 3. ❌ **ห้าม AI Agent ทำการ Rollback ฐานข้อมูลโดยพลการ (ให้ทำเฉพาะ Container Image Rollback ที่คง Schema เดิม)**

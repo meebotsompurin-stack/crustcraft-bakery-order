@@ -1,5 +1,5 @@
 # LAB5-ISSUE-09 — Architecture Documentation & Final Evidence Index PDF Report
-## Episode 9, Episode 10 & Handout Section 12: Architecture Guide & Concise Evidence Index Submission
+## Handout Section 12: Architecture Guide & Concise Evidence Index Submission
 
 ---
 
@@ -21,7 +21,7 @@
 1. เขียนเอกสาร `docs/labs/lab-05/deployment.md` ครอบคลุมทั้ง 5 หัวข้อบังคับตาม Handout §4.3
 2. รวบรวมหลักฐาน Link-First และภาพ Screenshot ที่ผ่านการ Crop ชัดเจน 100% ปราศจาก Plaintext Secret พร้อมหมายเลขกำกับ Caption: `"Figure X. C-0Y (R-0Z): <what it shows>. Commit/Run/URL."`
 3. จัดทำรายงาน PDF ในโครงสร้าง 5 ส่วนตาม Handout §12 ตั้งชื่อไฟล์ `lab5_sec<section>_<group name>.pdf` (เก็บนอก Git repo สำหรับอัปโหลดขึ้น LEB2 โดยไม่ commit ไฟล์ pdf ลงใน `docs/`)
-4. **ปฏิบัติตามกฎความต่อเนื่องของระบบอย่างเคร่งครัด (Continuous Availability Directive `B1`):** **ห้ามสั่ง Pause หรือ Teardown ทรัพยากร Cloud Run และ Cloud SQL เด็ดขาด** ต้องเปิดระบบให้ทำงานต่อเนื่องจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจให้คะแนนรายวิชาและเสร็จสิ้น Lab 6 Partner UAT
+4. **ปฏิบัติตามกฎความต่อเนื่องของระบบอย่างเคร่งครัด (Continuous Availability Directive `B1`):** **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
 
 ---
 
@@ -51,7 +51,7 @@
   - ตั้งชื่อไฟล์ PDF: `lab5_sec<section>_<group name>.pdf` (เช่น `lab5_sec1_group04.pdf`)
   - **ไฟล์ PDF ต้องถูกเก็บไว้นอก Git Repository สำหรับอัปโหลดขึ้น LEB2 — ห้าม Commit ไฟล์ PDF ลงในโฟลเดอร์ `docs/` เพื่อรักษาความสะอาดของ Repository**
 - [ ] **AC-LAB5-09-06 (Continuous Availability Directive `B1`):**
-  - **ห้าม Pause หรือ Teardown ทรัพยากร Cloud Run และ Cloud SQL เด็ดขาด**
+  - **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
   - Cloud Run Service และ Cloud SQL ต้องเปิดทำงานต่อเนื่องจนกว่าอาจารย์ผู้สอนจะประกาศสิ้นสุดการตรวจให้คะแนนและเสร็จสิ้น Lab 6 Partner UAT
 
 ---
@@ -86,7 +86,7 @@
 
 ### Answer Part 1: CI and Quality Gate (30 pts)
 - **C-01 Verification:** Link to passing CI run on normal PR, test summary output.
-- **Figure 1. C-01 (R-05):** Automated CI run summary passing 50/50 tests and Docker build.
+- **Figure 1. C-01 (R-05):** Automated CI run summary passing automated tests and Docker build.
 - **C-02 Verification:** Link to temporary failing PR (`test/prove-gate` into `main`), ruleset `protect-main` configuration.
 - **Figure 2. C-02 (R-06):** GitHub PR from temporary branch blocked by failing `test-and-docker` check.
 
@@ -120,11 +120,11 @@
 
 ---
 
-## 4. Policy on Pausing and Teardown (`B1`)
+## 4. Policy on Continuous Availability and Teardown (`B1`)
 
 > 🚨 **MANDATORY INSTRUCTION REGARDING GRADING & LAB 6 UAT:**
-> - **Episode 9 (Pause):** ใช้เพื่อหยุด Cloud SQL ชั่วคราวเฉพาะช่วงที่ไม่มีการเรียนการสอนหรือตรวจงาน และต้องเปิดกลับขึ้นมาทันทีเมื่อถึงกำหนดการตรวจ
-> - **Episode 10 (Teardown):** ห้ามรัน `deploy/teardown.sh` เด็ดขาดจนกว่าผู้สอนจะประกาศปิดการตรวจรายวิชา การลบทรัพยากรก่อนกำหนดจะทำให้ถูกหักคะแนนในส่วน Live Service
+> - **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
+> - **Teardown (`deploy/teardown.sh`):** ห้ามรัน `deploy/teardown.sh` เด็ดขาดจนกว่าผู้สอนจะประกาศปิดการตรวจรายวิชา การลบทรัพยากรก่อนกำหนดจะทำให้ถูกหักคะแนนในส่วน Live Service
 > - ให้คงสภาพระบบพร้อมใช้งานบน Public URL ตลอดเวลา
 
 ---
@@ -137,8 +137,10 @@ docs/labs/lab-05/deployment.md
 
 ---
 
-## 6. AI Agent & Secret Safety Rules (Strict Policy)
+## 6. AI Agent & Secret Safety Rules (Strict Policy `S6`)
+
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
 
 1. ❌ **ห้ามใส่ Secret จริงในรายงาน PDF หรือเอกสาร `deployment.md` เด็ดขาด**
-2. ❌ **ห้ามรันคำสั่ง Teardown หรือ Pause ฐานข้อมูลหลังสร้างเอกสารเสร็จ (`B1`)**
+2. ❌ **ห้ามรันคำสั่ง Teardown หรือ Pause ฐานข้อมูลเด็ดขาด (`B1`)**
 3. ❌ **ภาพหลักฐานทุกภาพต้องได้รับการตรวจสอบโดยสมาชิกทีมทั้งสองคนก่อนส่งงาน**

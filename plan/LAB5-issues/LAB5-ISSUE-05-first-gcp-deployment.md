@@ -24,7 +24,7 @@
 4. สร้าง Dedicated Runtime Service Account (`crustcraft-runner`) พร้อมสิทธิ์ Least Privilege (เข้าถึงเฉพาะ Secret ที่กำหนด)
 5. ดำเนินการ Build Image ผ่าน Cloud Build และ Execute Cloud Run Migration Job (`crustcraft-migrate`)
 6. Deploy Cloud Run Service (`crustcraft`) และทดสอบความพร้อมด้วย `deploy/smoke_test.py`
-7. **ปฏิบัติตามกฎความต่อเนื่องของระบบ (Continuous Availability Rule `B1`):** รักษาให้ Cloud Run และ Cloud SQL รันอยู่อย่างต่อเนื่องจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจงานและเสร็จสิ้น Lab 6 Partner UAT
+7. **ปฏิบัติตามกฎความต่อเนื่องของระบบ (Continuous Availability Rule `B1`):** Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.
 
 ---
 
@@ -70,7 +70,7 @@
     3. พิสูจน์ Rule Rejection หรือ Access Restriction 1 กรณี (เช่น ลูกค้าทั่วไปเข้า Operator Queue ไม่ได้ หรือสั่งซื้อด้วยจำนวนไม่ถูกต้องแล้วถูกปฏิเสธ)
   - บันทึกภาพหน้าจอพร้อมแสดง Public URL อย่างชัดเจน
 - [ ] **AC-LAB5-05-07 (Continuous Availability Compliance `B1`):**
-  - **ห้ามสั่ง Pause หรือ Teardown ทรัพยากรเด็ดขาดหลังเสร็จสิ้นขั้นตอนนี้**
+  - **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
   - ต้องเปิดให้ Cloud Run Service และ Cloud SQL ทำงานต่อเนื่องเพื่อรองรับการตรวจงานของผู้สอนและ Lab 6 Partner UAT
 
 ---
@@ -108,11 +108,11 @@ python3 deploy/smoke_test.py "$SERVICE_URL"
 
 ---
 
-## 5. Policy on Pause (Episode 9) and Teardown (Episode 10) (`B1`)
+## 5. Policy on Continuous Availability and Teardown (`B1`)
 
-> ⚠️ **CRITICAL DIRECTIVE ON RESOURCE AVAILABILITY:**
+> ⚠️ **CRITICAL DIRECTIVE ON RESOURCE AVAILABILITY (`B1`):**
+> - **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
 > - **ห้าม Teardown (`deploy/teardown.sh`) เด็ดขาด:** การสั่ง Teardown จะทำลาย Cloud SQL, Database, และข้อมูลคำสั่งซื้อทั้งหมดอย่างถาวร ห้ามรันจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจให้คะแนนรายวิชาอย่างเป็นทางการ
-> - **Episode 9 (Pause):** ใช้เฉพาะกรณีที่ไม่มีการใช้งานเป็นเวลานานหลายวันระหว่างเทอมเพื่อประหยัดงบประมาณ และต้อง Unpause ทันทีเมื่อเข้าสู่ช่วงประเมินผล
 > - ระบบต้องคงสถานะ **Active & Available** ตลอดช่วงเวลาส่งงาน Lab 5 และ Lab 6
 
 ---
@@ -125,6 +125,8 @@ docs/labs/lab-05/deployment.md
 ---
 
 ## 7. AI Agent & Secret Safety Rules (Strict Policy `S6`, `S7`)
+
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
 
 1. ❌ **ห้าม AI Agent รันคำสั่ง `gcloud` หรือสร้าง Resource บน Cloud โดยตรงโดยเด็ดขาด** คำสั่งทั้งหมดต้องถูก execute โดยสมาชิกทีมผ่าน Cloud Shell
 2. ❌ **อ่านและตรวจสอบสคริปต์ `deploy/deploy.sh` ทุกครั้งก่อนสั่งรันจริง**

@@ -13,7 +13,7 @@
 3. ติดตั้ง **Automated CI/CD Pipeline บน GitHub Actions** พร้อมระบบรักษาความปลอดภัยระดับองค์กรผ่าน **Workload Identity Federation (WIF)** โดยเด็ดขาดปราศจากการจัดเก็บ Long-lived Service Account JSON Key บน Repository
 4. บังคับใช้ **Branch Protection Ruleset & Merge Gate (`test-and-docker`)** ป้องกัน Code ที่มี Bug หรือ Migration ที่ล้มเหลวไม่ให้ Merge สู่ Production Branch (`main`)
 5. พิสูจน์ความสามารถในการทำ **Release, Live Smoke Testing, Persistence across revisions**, และ **Manual Rollback (Zero Downtime / Skip CI)** ตามเกณฑ์การให้คะแนน 100 คะแนนเต็ม
-6. ปฏิบัติตามมาตรฐานการส่งงานอย่างเคร่งครัด: **เปิด Cloud Run และ Cloud SQL ให้ทำงานต่อเนื่องจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจงานและเสร็จสิ้น Lab 6 Partner UAT** (ห้าม Pause หรือ Teardown ทันทีหลังถ่ายภาพ)
+6. ปฏิบัติตามมาตรฐานการส่งงานอย่างเคร่งครัด: **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
 
 ---
 
@@ -110,10 +110,9 @@
 ## 4. Cost Control & Safety Guardrails (Zero-Overrun & Continuous Availability Policy)
 
 1. **Continuous Availability Rule (CRITICAL - Handout §12 & §3):**
-   - **ห้ามทำการ Pause หรือ Teardown ทรัพยากร Cloud SQL และ Cloud Run ทันทีหลังจากการทดสอบหรือจับภาพหน้าจอเด็ดขาด**
+   - **Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.**
    - ผู้สอนและทีม Partner (Lab 6 UAT) ต้องสามารถเข้าถึงระบบผ่าน Public URL ได้ตลอดเวลา
-   - **Episode 9 (Pause):** ใช้งานเฉพาะระหว่าง Session ที่ไม่มีการใช้งานจริง หรือกรณีฉุกเฉิน และต้อง Unpause ทันทีเมื่อเข้าสู่ช่วงตรวจงานหรือทดสอบ
-   - **Episode 10 (Teardown):** ห้ามทำโดยเด็ดขาดจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจให้คะแนนรายวิชาอย่างเป็นทางการ เพราะ Teardown จะทำลายฐานข้อมูลและประวัติการทำงานอย่างถาวร
+   - การสั่ง Pause หรือ Teardown ทรัพยากรตลอดช่วงระยะเวลาการตรวจงานและการทำ Lab 6 UAT เป็นสิ่งต้องห้ามโดยเด็ดขาด การทำลายทรัพยากร (Teardown) จะทำได้ก็ต่อเมื่อผู้สอนประกาศสิ้นสุดการตรวจให้คะแนนรายวิชาอย่างเป็นทางการเท่านั้น เพราะจะทำลายฐานข้อมูลและประวัติการทำงานอย่างถาวร
 2. **Cloud SQL Instance Tier:** กำหนดชัดเจนเป็น `db-f1-micro` พร้อม `--edition=enterprise` (Lowercase ตาม Requirement)
 3. **Storage Auto-increase Disabled:** บังคับปิด Storage Auto-increase ใน `deploy.sh` เพื่อป้องกัน disk ขยายตัวเกิน 10GB อัตโนมัติ (`--no-storage-auto-increase`)
 4. **Budget Alert Thresholds:** ตั้ง Budget Alert $250 พร้อมแจ้งเตือน 4 ระดับ คือ 10% ($25), 20% ($50), 50% ($125), และ 90% ($225) สู่อีเมลของสมาชิกทีมทั้งสองคน โดยต้องสร้าง Budget ก่อนสร้างทรัพยากรที่คิดค่าบริการใดๆ
@@ -167,6 +166,8 @@
 
 ## 7. AI Agent & Secret Safety Rules (Mandatory across ALL Issues)
 
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
+
 1. **No Autonomous Cloud Operations:** ห้าม AI Agent รันคำสั่ง `gcloud`, แก้ไข IAM, เปลี่ยนแปลง Billing, หรือจัดการ Database บน Cloud โดยปราศจากการตรวจสอบและสั่งการจากมนุษย์
 2. **Read Before Run:** สมาชิกทีมต้องอ่านและทำความเข้าใจคำสั่ง shell ทุกคำสั่งก่อนสั่ง execute บน Cloud Shell หรือเครื่อง local
 3. **No Secret Ingestion:** ห้ามนำ Production Password, Connection String จริง, หรือ Private Key วางลงใน AI Prompt หรือบันทึกลงใน Markdown / Screenshot เด็ดขาด
@@ -187,5 +188,5 @@ plan/LAB5-issues/
 ├── LAB5-ISSUE-06-wif-and-merge-gate.md       (Episode 6: WIF, GitHub env, Merge Gate C-02)
 ├── LAB5-ISSUE-07-auto-deploy-pipeline.md     (Episode 7: deploy.yml, auto release pipeline, C-06)
 ├── LAB5-ISSUE-08-persistence-and-rollback.md (Episode 8: Persistence test C-05 & Rollback protocol)
-└── LAB5-ISSUE-09-docs-and-pdf-submission.md  (Episode 9: deployment.md, 5-part Evidence PDF report)
+└── LAB5-ISSUE-09-docs-and-pdf-submission.md  (Handout §12: deployment.md, 5-part Evidence PDF report)
 ```

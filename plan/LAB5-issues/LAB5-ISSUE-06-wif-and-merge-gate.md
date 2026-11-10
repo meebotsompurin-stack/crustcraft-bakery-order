@@ -152,6 +152,8 @@ docs/labs/lab-05/deployment.md
 
 ## 6. AI Agent & Secret Safety Rules (Strict Policy)
 
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
+
 1. ❌ **ห้ามสร้างหรือ Export Service Account JSON Key โดยเด็ดขาด** (การยืนยันตัวตนทั้งหมดต้องผ่าน WIF OIDC Token เท่านั้น)
 2. ❌ **ห้าม AI Agent แก้ไขการตั้งค่า GitHub Ruleset หรือลดหย่อนระดับความปลอดภัย**
 3. ❌ **ห้ามรันการลบ Branch หรือปิด PR โดยพลการหากยังไม่ได้บันทึกภาพหลักฐาน `C-02`**

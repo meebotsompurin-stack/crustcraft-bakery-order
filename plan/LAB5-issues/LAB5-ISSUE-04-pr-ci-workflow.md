@@ -19,10 +19,10 @@
 
 ติดตั้งระบบ Continuous Integration (CI) บน GitHub Actions ผ่านไฟล์ `.github/workflows/ci-docker.yml` และ `.github/dependabot.yml` เพื่อทำหน้าที่เป็นด่านทดสอบคุณภาพอัตโนมัติ (Automated Quality Gate) ตรวจสอบโค้ดทุกครั้งที่มีการเปิด Pull Request เข้าสู่ Branch `lab-5-staging` และ `main` (`B2`, `R-05`):
 1. **เตรียมและดัดแปลงสคริปต์โฟลเดอร์ `deploy/` ทั้งหมด (`B4`):** คัดลอกและปรับแต่ง `deploy/deploy.sh`, `deploy/release.sh`, `deploy/smoke_test.py`, `deploy/teardown.sh` และชุดทดสอบ `deploy/tests/` ให้พร้อมใน Issue นี้ เพื่อให้ CI สามารถรัน Offline Syntax & Stub Checks ได้ทันที
-2. ติดตั้ง Service Container PostgreSQL 16 บน GitHub Actions Runner เพื่อรัน Migration, Seeding, และ Automated Vitest Integration Tests (ครบ 50/50 tests) โดยใช้รหัสผ่านและค่า Ephemeral CI Test เท่านั้น (`S5`)
+2. ติดตั้ง Service Container PostgreSQL 16 บน GitHub Actions Runner เพื่อรัน Migration, Seeding, และ Automated Vitest Integration Tests โดยใช้รหัสผ่านและค่า Ephemeral CI Test เท่านั้น (`S5`)
 3. ตรวจสอบการ Compile TypeScript และการ Build Production ของ Client (`npm run build`)
 4. ตรวจสอบว่า Unified Production Dockerfile สามารถ Build ได้สำเร็จจริงบน Runner
-5. ตั้งค่า Dependabot เพื่อดูแล Dependency และ Action versions พร้อมแนะนำการ Pin Action เป็น 40-character Commit SHA เพื่อความปลอดภัยระดับ Enterprise (`S5`)
+5. ตั้งค่า Dependabot เพื่อดูแล Dependency และ Action versions พร้อมกำหนดให้ **GitHub Actions ทั้งหมดต้องถูก Pin เป็น Full 40-character Commit SHA** แทนการใช้ Version Tag ทั่วไป (เช่น `@v4`, `@v5`) เพื่อความปลอดภัยระดับ Supply Chain Security สูงสุด (`S5`)
 
 ---
 
@@ -35,7 +35,8 @@
     - `workflow_dispatch`
   - **Job ID ต้องเป็น `test-and-docker`** เท่านั้น (ห้ามเปลี่ยนชื่อ เนื่องจาก Rubric และ Ruleset อ้างอิง ID นี้)
   - กำหนด Concurrency Group พร้อม `cancel-in-progress: true`
-- [ ] **AC-LAB5-04-02 (Node.js 22 & PostgreSQL 16 Service Container `S2`):**
+- [ ] **AC-LAB5-04-02 (Node.js 22, Action Pinning & PostgreSQL 16 Service Container `S2`, `S5`):**
+  - GitHub Actions ทุกตัวใน Workflow ต้องถูก Pin เข้ากับ Full 40-character Commit SHA เสมอ (เช่น `actions/checkout`, `actions/setup-node`, `actions/setup-python`)
   - ใช้ Action `actions/setup-node` ระบุ `node-version: "22"`
   - Service Container ใช้ `postgres:16-alpine` พร้อม healthcheck `pg_isready`
 - [ ] **AC-LAB5-04-03 (Complete `deploy/` Adaptation & Offline Tests `B4`):**
@@ -58,7 +59,7 @@
   - ใช้ Ephemeral non-secret CI Environment Variables (`S5`):
     - `DATABASE_URL: postgresql://crustcraft:crustcraft_test_password@localhost:5432/crustcraft_test?schema=public`
     - `JWT_SECRET: crustcraft-ci-jwt-test-secret-value-not-for-prod`
-  - รัน `npm ci`, `npx prisma generate`, `npx prisma migrate deploy`, `npm run seed`, และ `npm test` ผ่านครบ 50/50 tests
+  - รัน `npm ci`, `npx prisma generate`, `npx prisma migrate deploy`, `npm run seed`, และ `npm test` พร้อมบันทึก Actual Test Summary Output ตรวจสอบว่าทุกการทดสอบผ่านสมบูรณ์
 - [ ] **AC-LAB5-04-05 (Client Build & Docker Build):**
   - Build Client SPA ผ่านโดยไม่มี Lint หรือ Type errors
   - คำสั่ง `docker build -t crustcraft:ci .` ผ่านสมบูรณ์บน Runner
@@ -110,17 +111,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
         with:
           node-version: "22"
 
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
 
@@ -183,6 +184,8 @@ docs/labs/lab-05/deployment.md
 ---
 
 ## 6. AI Agent & Secret Safety Rules (Strict Policy)
+
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
 
 1. ❌ **ค่า `JWT_SECRET` และ `POSTGRES_PASSWORD` ใน CI เป็นเพียงค่าจำลอง (Ephemeral Mock Values) สำหรับการทดสอบ ห้ามนำไปใช้เป็น Production Secret เด็ดขาด**
 2. ❌ **ห้าม AI Agent เพิ่มขั้นตอนที่มีการเชื่อมต่อ Secret Manager หรือดาวน์โหลด Key ใน workflow นี้เด็ดขาด (Workflow นี้ต้องทำงานแบบ Offline 100%)**

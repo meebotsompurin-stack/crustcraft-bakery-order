@@ -96,6 +96,8 @@
 
 ## 5. AI Agent & Secret Safety Rules (Strict Policy)
 
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
+
 1. ❌ **ห้ามให้ AI Agent ดำเนินการคำสั่ง `gcloud` หรือสร้างทรัพยากรบน Cloud แบบอัตโนมัติ**
 2. ❌ **ห้ามนำ Billing Account ID, บัตรเครดิต, หรือ Secret ใดๆ วางลงใน AI Prompt หรือบันทึกลงใน Repository**
 3. ❌ **ห้ามดาวน์โหลด Service Account JSON Key** ลงมาเด็ดขาด (เราจะใช้ Workload Identity Federation ใน Episode 6)

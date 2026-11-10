@@ -39,7 +39,7 @@
   - ทำการ Clean และ Re-generate Migration Baseline ใหม่สำหรับ PostgreSQL 16 ภายใต้ `prisma/migrations/`
   - ปรับปรุง Seed Script (`prisma/seed.ts`) ให้ทำงานแบบ Idempotent (`upsert`) บน PostgreSQL
   - ตรวจสอบว่า Script ใน `package.json` (`db:migrate`, `seed`, `test`) สามารถทำงานร่วมกับ PostgreSQL 16 ได้อย่างไร้รอยต่อ
-  - สมาชิกในทีมสามารถรัน Automated Test ชุดเดิมครบทั้ง 50/50 tests ได้ผลลัพธ์ **100% GREEN** เมื่อเชื่อมต่อกับ PostgreSQL
+  - สมาชิกในทีมสามารถรัน Automated Test Suite ได้ผลลัพธ์ **100% GREEN** เมื่อเชื่อมต่อกับ PostgreSQL และบันทึก Actual Test Summary Output ไว้ยืนยัน
   - *Note:* การเปลี่ยน Datasource Provider สู่ `postgresql` สอดคล้องกับเอกสารสถาปัตยกรรม `docs/system-sds.md` ที่ระบุไว้ตั้งแต่ต้น
 - [ ] **AC-LAB5-02-02 (Readiness Probe Endpoint `S1`):**
   - เพิ่ม Endpoint `GET /api/ready` ใน `server/src/app.ts` (หรือ router เฉพาะ):
@@ -135,7 +135,7 @@ if (process.env.NODE_ENV === 'production') {
      npm run seed
      ```
 2. **Automated Vitest Suite:**
-   - รัน `npm test` เพื่อยืนยันว่า 50 API & Unit Tests ผ่านทั้งหมด 100%
+   - รัน `npm test` เพื่อยืนยันว่า Automated Unit & Integration Tests ผ่านทั้งหมด 100% พร้อมบันทึก Test Summary Output
 3. **Endpoint Validation:**
    ```bash
    curl -f http://localhost:3000/api/health
@@ -165,6 +165,8 @@ docs/labs/lab-05/deployment.md
 ---
 
 ## 6. AI Agent & Secret Safety Rules (Strict Policy)
+
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
 
 1. ❌ **ห้าม Hardcode หรือแสดง Production Passwords ในไฟล์ Source Code หรือ Documentation**
 2. ❌ **ห้ามนำ Secret จริงใส่ใน `.env.example` เด็ดขาด ให้ใช้เฉพาะ Dummy Values สำหรับพัฒนา**

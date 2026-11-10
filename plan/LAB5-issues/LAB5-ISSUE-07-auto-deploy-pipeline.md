@@ -113,7 +113,7 @@ jobs:
       ROLLBACK: ${{ inputs.image_tag != '' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
 
@@ -124,12 +124,12 @@ jobs:
           [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo 'Image tag must be a full 40-character commit SHA.'; exit 1; }
 
       - name: Authenticate to Google Cloud via WIF
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@71f9e21972fae77b1222eecda1753174e62630f5 # v2.1.8
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@6184eb66b576856555c5dfc14041b6c7a0d4c82c # v2.1.1
 
       - name: Build and push image
         if: env.ROLLBACK != 'true'
@@ -143,7 +143,7 @@ jobs:
         run: bash deploy/release.sh
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: "3.12"
 
@@ -195,6 +195,8 @@ docs/labs/lab-05/deployment.md
 ---
 
 ## 7. AI Agent & Secret Safety Rules (Strict Policy)
+
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
 
 1. ❌ **ห้ามรันการ Deploy สู่ Production จาก Local Machine หรือ AI Agent** ทุกการ Deploy ต้องผ่าน GitHub Actions WIF บนกิ่ง `main` เท่านั้น
 2. ❌ **ห้ามใช้ Credentials ของ Admin/Operator ในการรัน Smoke Test อัตโนมัติ** ให้ใช้เฉพาะบัญชี Customer สิทธิ์ต่ำสุด

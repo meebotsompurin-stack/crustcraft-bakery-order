@@ -35,12 +35,13 @@
   - **Stage 3 (`production`):** คัดลอกเฉพาะ production dependencies, runtime artifacts, ไฟล์ client bundle, และชุดคำสั่ง Prisma Migration/Seed
   - รัน Container ด้วยผู้ใช้สิทธิ์ต่ำ **`USER node`**
   - ไม่ใช้ `dumb-init` โดยไม่จำเป็น ให้ใช้ Shell Entrypoint (`docker-entrypoint.sh`) ที่มีคำสั่ง `exec "$@"` เพื่อรับส่งสัญญาณ `SIGTERM` / `SIGINT` ให้ Node process โดยตรง (`S3`)
-- [ ] **AC-LAB5-03-02 (Prisma Migration Job Capability in Image `S3`):**
+- [ ] **AC-LAB5-03-02 (Prisma CLI & Migration Job Capability in Image `S3`):**
+  - เนื่องจากคำสั่ง `npm ci --omit=dev` จะตัด `devDependencies` ซึ่งรวมถึง `prisma` CLI ออกไป ทำให้คำสั่งรัน Migration ล้มเหลว ดังนั้นใน Runtime Image จะต้องทำการติดตั้ง Prisma CLI อย่างชัดเจน (เช่น `RUN npm install -g prisma`)
   - Runtime Image ต้องมีไฟล์ `prisma/schema.prisma`, `prisma/migrations/**`, `prisma/seed.ts`, และ `prisma` CLI พร้อมรันคำสั่ง:
     ```bash
     npx prisma migrate deploy && npm run seed
     ```
-    สำหรับใช้ใน Cloud Run Job (`crustcraft-migrate`)
+    สำหรับใช้ใน Cloud Run Job (`crustcraft-migrate`) ได้อย่างสมบูรณ์โดยไม่ขาด CLI tool
 - [ ] **AC-LAB5-03-03 (Strict `.dockerignore`):**
   - บล็อกไม่ให้ไฟล์ sensitive หรือ dev caches หลุดเข้าไปใน Image: `**/node_modules`, `**/dist`, `**/.env*`, `*.db*`, `test-results`, `playwright-report`, `gha-creds-*.json`, `.git`
 - [ ] **AC-LAB5-03-04 (Local Development with Docker Compose):**
@@ -95,6 +96,9 @@ RUN npm run build --workspace=server
 FROM node:22-alpine AS production
 WORKDIR /app
 RUN apk add --no-cache openssl
+
+# Explicitly install Prisma CLI globally so migration job works even when devDependencies are omitted (S3)
+RUN npm install -g prisma
 
 # Set up non-root user and directories
 ENV NODE_ENV=production
@@ -192,6 +196,8 @@ docs/labs/lab-05/deployment.md
 ---
 
 ## 6. AI Agent & Secret Safety Rules (Strict Policy)
+
+> 🛡️ **AI Safety Rule: Do not allow AI agents to autonomously run `gcloud` commands or modify billing, IAM, or database resources. Never paste secrets or passwords into AI chats or screenshots.**
 
 1. ❌ **ห้าม AI Agent ใส่ Production Database Credentials ลงใน `docker-compose.yml` หรือ Dockerfile**
 2. ❌ **ห้าม Bake ไฟล์ `.env` เข้าไปใน Docker Image เด็ดขาด** ตรวจสอบผ่าน `.dockerignore` ทุกครั้ง
