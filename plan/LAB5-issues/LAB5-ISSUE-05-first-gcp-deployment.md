@@ -1,5 +1,5 @@
 # LAB5-ISSUE-05 — First GCP Deployment via Cloud Shell (`deploy.sh`)
-## Episode 5: Automated Infrastructure Provisioning & Initial Cloud Run Service
+## Episode 5: Automated Infrastructure Provisioning, Continuous Availability & Initial Cloud Run Service
 
 ---
 
@@ -7,67 +7,71 @@
 |---|---|
 | **ID / Title** | `LAB5-ISSUE-05` — First GCP Deployment via Cloud Shell (`deploy.sh`) |
 | **Type** | `deploy` / `infra` |
-| **Branch** | `deploy/lab5-issue-05-first-gcp-deployment` |
+| **Branch** | `deploy/lab5-issue-05-first-gcp-deployment` (branch from `lab-5-staging`) |
 | **Depends on** | `LAB5-ISSUE-04-pr-ci-workflow.md` |
-| **Lab 5 Rubric** | Traceability `C-04` (First GCP Deployment), `R-03` (Least Privilege & Secret Protection) |
+| **Lab 5 Rubric** | Category 3: GCP deployment and persistence (35 pts) — `C-04` (`R-03`), `R-09`, `R-10` |
 | **Primary Owners**| Purin Mebotsom (`@meebotsompurin-stack`), Saksorn Buranatananun (`@poom2548`) |
+| **Issue Labels** | `lab5`, `gcp`, `deployment`, `infrastructure` |
 
 ---
 
 ## 1. Objective
 
-ดำเนินการเขียนและปรับปรุงสคริปต์ `deploy/deploy.sh`, `deploy/teardown.sh`, และ `deploy/smoke_test.py` ให้เป็นชื่อเฉพาะของระบบ CrustCraft (`crustcraft`, `crustcraft-pg`, `crustcraft-runner`, ฯลฯ) จากนั้นทำการทดสอบรันแบบ Dry Run บน Cloud Shell และทำการ Provisioning ทรัพยากรจริงบน GCP เป็นครั้งแรก (One-Time Initial Setup):
-1. เปิดใช้งาน APIs ที่จำเป็น (Cloud Run, Cloud SQL Admin, Artifact Registry, Cloud Build, Secret Manager, IAM)
-2. สร้าง Artifact Registry Repository (`crustcraft`) ใน Region `asia-southeast1`
-3. สร้าง Cloud SQL Instance (`crustcraft-pg`) PostgreSQL 16 `db-f1-micro` Enterprise Edition พร้อมปิด Storage Auto-increase
-4. สุ่มรหัสผ่านที่ปลอดภัยด้วย `openssl` และจัดเก็บลง Google Secret Manager โดยไม่มีการพิมพ์ Plaintext Password ออกทาง Console/Log
-5. สร้าง Dedicated Runtime Service Account (`crustcraft-runner`) และผูกสิทธิ์เฉพาะเจาะจง (Per-Secret Secret Accessor)
-6. สั่ง Build Production Image ผ่าน Cloud Build และ Deploy เป็น Cloud Run Migration Job (`crustcraft-migrate`)
-7. รัน Migration Job ให้เสร็จสิ้น แล้วจึง Deploy Cloud Run Service (`crustcraft`) พร้อมทดสอบ Smoke Test ยืนยันความสมบูรณ์
+ดำเนินการรันสคริปต์ `deploy/deploy.sh` (ซึ่งผ่านการตรวจรับและ Commit มาจาก `LAB5-ISSUE-04` บน Branch `main` เรียบร้อยแล้ว `B4`) บน Google Cloud Shell เพื่อสร้างและตั้งค่าทรัพยากรทั้งหมดบน Google Cloud Platform เป็นครั้งแรก (One-Time Initial Infrastructure Provisioning):
+1. ตรวจสอบเนื้อหาของสคริปต์ `deploy/deploy.sh` อย่างละเอียดก่อนการรัน และทดสอบด้วยโหมด Dry Run (`DRY_RUN=1`) เสมอ (`S6`)
+2. สร้างทรัพยากรหลัก: Artifact Registry (`crustcraft`), Cloud SQL PostgreSQL 16 (`crustcraft-pg`, `db-f1-micro`, 10GB SSD, Auto-increase OFF)
+3. สุ่มสร้าง Secret ผ่าน `openssl` และจัดเก็บลง Google Secret Manager โดยไม่มีการพิมพ์ Plaintext Password ออกทาง Console หรือเอกสาร (`S7`)
+4. สร้าง Dedicated Runtime Service Account (`crustcraft-runner`) พร้อมสิทธิ์ Least Privilege (เข้าถึงเฉพาะ Secret ที่กำหนด)
+5. ดำเนินการ Build Image ผ่าน Cloud Build และ Execute Cloud Run Migration Job (`crustcraft-migrate`)
+6. Deploy Cloud Run Service (`crustcraft`) และทดสอบความพร้อมด้วย `deploy/smoke_test.py`
+7. **ปฏิบัติตามกฎความต่อเนื่องของระบบ (Continuous Availability Rule `B1`):** รักษาให้ Cloud Run และ Cloud SQL รันอยู่อย่างต่อเนื่องจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจงานและเสร็จสิ้น Lab 6 Partner UAT
 
 ---
 
 ## 2. Acceptance Criteria
 
-- [ ] **AC-LAB5-05-01:** สคริปต์ `deploy/deploy.sh` ถูกดัดแปลงชื่อทรัพยากรอย่างสมบูรณ์:
-  - `REPO_NAME="crustcraft"`
-  - `SQL_INSTANCE="crustcraft-pg"`
-  - `DB_NAME="crustcraft"`
-  - `DB_USER="crustcraft"`
-  - `SERVICE_NAME="crustcraft"`
-  - `MIGRATE_JOB_NAME="crustcraft-migrate"`
-  - `SA_NAME="crustcraft-runner"`
-  - Secret names: `crustcraft-database-url`, `crustcraft-admin-password`, `crustcraft-demo-password`
-- [ ] **AC-LAB5-05-02:** ในขั้นตอนสร้าง Cloud SQL instance ต้องมี Option:
-  - `--database-version=POSTGRES_16`
-  - `--edition=enterprise` (Lowercase)
-  - `--tier=db-f1-micro`
-  - `--region=asia-southeast1`
-  - `--storage-size=10GB`
-  - `--no-storage-auto-increase` (เพื่อป้องกันค่าใช้จ่ายบานปลาย)
-- [ ] **AC-LAB5-05-03:** Function `run_cmd` ทำการ Redact `--password=...` ออกจาก Console Log เสมอ
-- [ ] **AC-LAB5-05-04:** ทดสอบรัน Dry Run บน Cloud Shell สำเร็จ:
-  ```bash
-  DRY_RUN=1 PROJECT_ID=cpe334-crustcraft bash deploy/deploy.sh
-  ```
-  ไม่มีการเรียกคำสั่ง GCP จริง และแสดงขั้นตอนการสร้างทรัพยากรครบถ้วน
-- [ ] **AC-LAB5-05-05:** ดำเนินการรัน Deploy จริงบน Cloud Shell:
-  ```bash
-  PROJECT_ID=cpe334-crustcraft bash deploy/deploy.sh --demo
-  ```
-  - Cloud SQL สร้างสำเร็จและสถานะเป็น RUNNABLE
-  - Migration Job รัน `prisma migrate deploy` และ `prisma:seed` ผ่าน 100%
-  - Cloud Run Service เริ่มทำงานและแสดง Service URL
-- [ ] **AC-LAB5-05-06:** ตรวจสอบความถูกต้องของสิทธิ์ IAM:
-  - `crustcraft-runner` มีบทบาท `roles/cloudsql.client`
-  - มีสิทธิ์ `roles/secretmanager.secretAccessor` เฉพาะบน Secret ของโปรเจกต์ (ไม่มีสิทธิ์ระดับ Project-wide)
-- [ ] **AC-LAB5-05-07:** ทำการทดสอบ Public URLs ผ่าน `curl`:
-  ```bash
-  curl -f "$SERVICE_URL/api/health"
-  curl -f "$SERVICE_URL/api/ready"
-  ```
-  คืนค่า HTTP 200 และแสดง `{"status":"ok"}` และ `{"status":"ready","db":"connected"}` ตามลำดับ
-- [ ] **AC-LAB5-05-08:** รันสคริปต์ `deploy/smoke_test.py "$SERVICE_URL"` ผ่านครบทุกข้อ (PASS /api/health, PASS /api/ready, PASS /, PASS /api/catalog)
+- [ ] **AC-LAB5-05-01 (Pre-flight Review & Dry Run `S6`):**
+  - สมาชิกทีมทำการ Review สคริปต์ `deploy/deploy.sh` ยืนยันว่าไม่มี Hardcoded Secret หรือ Parameter ผิดพลาด
+  - รัน Dry Run บน Cloud Shell สำเร็จ:
+    ```bash
+    DRY_RUN=1 PROJECT_ID=cpe334-crustcraft bash deploy/deploy.sh
+    ```
+    ยืนยันว่าคำสั่งแสดงแผนการทำงานครบถ้วนโดยไม่มี Error
+- [ ] **AC-LAB5-05-02 (Cloud SQL Provisioning Guardrails):**
+  - Cloud SQL instance สร้างด้วยพารามิเตอร์:
+    - `--database-version=POSTGRES_16`
+    - `--edition=enterprise` (Lowercase)
+    - `--tier=db-f1-micro`
+    - `--region=asia-southeast1`
+    - `--storage-size=10GB`
+    - `--no-storage-auto-increase` (ป้องกันค่าใช้จ่ายบานปลาย)
+- [ ] **AC-LAB5-05-03 (Secret Protection in Secret Manager `S7`):**
+  - สร้าง Secret ครบ 4 ตัว:
+    - `crustcraft-database-url`
+    - `crustcraft-jwt-secret`
+    - `crustcraft-admin-password`
+    - `crustcraft-demo-password`
+  - สคริปต์ต้อง Mask/Redact flags `--password=...` ออกจาก Console Log ทั้งหมด
+  - ห้ามพิมพ์หรือบันทึก Production Passwords จริงลงใน Markdown หรือ Screenshot (แชร์รหัสผ่านสำหรับ Lab 6 UAT ผ่านช่องทางส่วนตัวเท่านั้น)
+- [ ] **AC-LAB5-05-04 (Cloud Run Migration Job Execution):**
+  - รัน Cloud Run Job `crustcraft-migrate` ให้เสร็จสิ้นสมบูรณ์
+  - หาก Migration ล้มเหลว ให้อ่าน Log จาก Cloud Logging ก่อนทำการ Retry เสมอ (`S6`)
+- [ ] **AC-LAB5-05-05 (Cloud Run Service Deployment & Public Health `C-04`):**
+  - Cloud Run Service `crustcraft` เปิดให้บริการที่ Public URL และคืนค่า HTTP 200:
+    ```bash
+    curl -f "$SERVICE_URL/api/health"
+    curl -f "$SERVICE_URL/api/ready"
+    ```
+  - รันสคริปต์ `deploy/smoke_test.py "$SERVICE_URL"` ผ่านครบทุกเงื่อนไข
+- [ ] **AC-LAB5-05-06 (Domain Workflow Demonstration `C-04`):**
+  - ทดสอบการทำงานของระบบบน Public URL ผ่าน Browser:
+    1. Sign In ด้วยบัญชีผู้ใช้
+    2. ทำธุรกรรมหลักของธุรกิจ (Browse Catalog & Create Order)
+    3. พิสูจน์ Rule Rejection หรือ Access Restriction 1 กรณี (เช่น ลูกค้าทั่วไปเข้า Operator Queue ไม่ได้ หรือสั่งซื้อด้วยจำนวนไม่ถูกต้องแล้วถูกปฏิเสธ)
+  - บันทึกภาพหน้าจอพร้อมแสดง Public URL อย่างชัดเจน
+- [ ] **AC-LAB5-05-07 (Continuous Availability Compliance `B1`):**
+  - **ห้ามสั่ง Pause หรือ Teardown ทรัพยากรเด็ดขาดหลังเสร็จสิ้นขั้นตอนนี้**
+  - ต้องเปิดให้ Cloud Run Service และ Cloud SQL ทำงานต่อเนื่องเพื่อรองรับการตรวจงานของผู้สอนและ Lab 6 Partner UAT
 
 ---
 
@@ -77,30 +81,51 @@
 |---|---|---|
 | **Artifact Registry** | `crustcraft` | Docker format, `asia-southeast1` |
 | **Cloud SQL** | `crustcraft-pg` | PostgreSQL 16, `db-f1-micro`, Enterprise, 10GB SSD |
-| **Database / User**| `crustcraft` / `crustcraft` | Password ใน Secret Manager |
-| **Service Account**| `crustcraft-runner` | Runtime Least Privilege |
+| **Database / User**| `crustcraft` / `crustcraft` | Password สุ่มและเก็บใน Secret Manager |
+| **Service Account**| `crustcraft-runner` | Runtime Least Privilege (`roles/cloudsql.client`, Secret Accessor) |
 | **Cloud Run Job** | `crustcraft-migrate` | รัน `npx prisma migrate deploy && npm run seed` |
 | **Cloud Run Svc** | `crustcraft` | Port 3000, Min 0, Max 3, 512MiB, 1 CPU |
 
 ---
 
-## 4. Teardown & Cost Management (`deploy/teardown.sh`)
+## 4. Execution Commands (via Cloud Shell)
 
-สคริปต์ `deploy/teardown.sh` ต้องถูกเตรียมพร้อมไว้เสมอสำหรับลบหรือหยุดทรัพยากรทั้งหมดเพื่อไม่ให้เกิดค่าใช้จ่ายสะสมหลังการทดสอบ:
 ```bash
-# Preview deletion without executing
-DRY_RUN=1 bash deploy/teardown.sh
+# 1. Ensure clean workspace on branch main
+git checkout main
+git pull origin main
 
-# Permanent teardown (requires manual project id confirmation)
-bash deploy/teardown.sh
+# 2. Dry run preview
+DRY_RUN=1 PROJECT_ID="cpe334-crustcraft" bash deploy/deploy.sh
+
+# 3. Real deployment execution
+PROJECT_ID="cpe334-crustcraft" bash deploy/deploy.sh --demo
+
+# 4. Verify deployment with Smoke Test
+SERVICE_URL=$(gcloud run services describe crustcraft --region=asia-southeast1 --format='value(status.url)')
+python3 deploy/smoke_test.py "$SERVICE_URL"
 ```
 
 ---
 
-## 5. Files Allowed (Whitelist)
+## 5. Policy on Pause (Episode 9) and Teardown (Episode 10) (`B1`)
+
+> ⚠️ **CRITICAL DIRECTIVE ON RESOURCE AVAILABILITY:**
+> - **ห้าม Teardown (`deploy/teardown.sh`) เด็ดขาด:** การสั่ง Teardown จะทำลาย Cloud SQL, Database, และข้อมูลคำสั่งซื้อทั้งหมดอย่างถาวร ห้ามรันจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจให้คะแนนรายวิชาอย่างเป็นทางการ
+> - **Episode 9 (Pause):** ใช้เฉพาะกรณีที่ไม่มีการใช้งานเป็นเวลานานหลายวันระหว่างเทอมเพื่อประหยัดงบประมาณ และต้อง Unpause ทันทีเมื่อเข้าสู่ช่วงประเมินผล
+> - ระบบต้องคงสถานะ **Active & Available** ตลอดช่วงเวลาส่งงาน Lab 5 และ Lab 6
+
+---
+
+## 6. Files Allowed (Whitelist)
 ```
-deploy/deploy.sh
-deploy/release.sh
-deploy/smoke_test.py
-deploy/teardown.sh
+docs/labs/lab-05/deployment.md
 ```
+
+---
+
+## 7. AI Agent & Secret Safety Rules (Strict Policy `S6`, `S7`)
+
+1. ❌ **ห้าม AI Agent รันคำสั่ง `gcloud` หรือสร้าง Resource บน Cloud โดยตรงโดยเด็ดขาด** คำสั่งทั้งหมดต้องถูก execute โดยสมาชิกทีมผ่าน Cloud Shell
+2. ❌ **อ่านและตรวจสอบสคริปต์ `deploy/deploy.sh` ทุกครั้งก่อนสั่งรันจริง**
+3. ❌ **ห้ามนำรหัสผ่านจริงที่สร้างขึ้นไปโพสต์ใน AI Chat หรือแปะใน Issue/PR/Docs เด็ดขาด**

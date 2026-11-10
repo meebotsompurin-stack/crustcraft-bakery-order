@@ -9,29 +9,50 @@
 
 เป้าหมายสูงสุดของ Lab 5 คือ:
 1. ปรับปรุงแอปพลิเคชัน CrustCraft ให้เป็น **Cloud-Ready 12-Factor App** สามารถรันได้ทั้งบน Local Development (Docker Compose) และ Production Serverless Container (Google Cloud Run)
-2. อัปเกรด Data Tier สู่ **Cloud SQL for PostgreSQL 16 (Enterprise Edition, db-f1-micro)** เพื่อรองรับการเก็บข้อมูลถาวร (Persistent Storage) พร้อมกลไก Non-destructive Prisma Database Migration และ Idempotent Seeding
+2. ย้ายระบบจัดเก็บข้อมูลจาก SQLite สู่ **Cloud SQL for PostgreSQL 16 (Enterprise Edition, db-f1-micro)** เพื่อรองรับการเก็บข้อมูลถาวร (Persistent Storage) พร้อมกลไก Prisma Database Migration และ Idempotent Seeding
 3. ติดตั้ง **Automated CI/CD Pipeline บน GitHub Actions** พร้อมระบบรักษาความปลอดภัยระดับองค์กรผ่าน **Workload Identity Federation (WIF)** โดยเด็ดขาดปราศจากการจัดเก็บ Long-lived Service Account JSON Key บน Repository
 4. บังคับใช้ **Branch Protection Ruleset & Merge Gate (`test-and-docker`)** ป้องกัน Code ที่มี Bug หรือ Migration ที่ล้มเหลวไม่ให้ Merge สู่ Production Branch (`main`)
 5. พิสูจน์ความสามารถในการทำ **Release, Live Smoke Testing, Persistence across revisions**, และ **Manual Rollback (Zero Downtime / Skip CI)** ตามเกณฑ์การให้คะแนน 100 คะแนนเต็ม
+6. ปฏิบัติตามมาตรฐานการส่งงานอย่างเคร่งครัด: **เปิด Cloud Run และ Cloud SQL ให้ทำงานต่อเนื่องจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจงานและเสร็จสิ้น Lab 6 Partner UAT** (ห้าม Pause หรือ Teardown ทันทีหลังถ่ายภาพ)
 
 ---
 
-## 2. Lab 5 Rubric & Traceability Matrix (100 Points)
+## 2. Lab 5 Rubric & Requirements Traceability Matrix (100 Points)
 
-| Rubric Category | Points | Criteria Code | Requirement Description | Mapped LAB5 Issue |
+### 2.1 Handout 4-Part Rubric Structure (100 Points Total)
+
+| Rubric Category | Points | Handout Checks & Requirements | Key Evaluation Focus | Mapped Issues |
 |---|---|---|---|---|
-| **CI & Quality Gate** | **30 pts** | `C-01` | Automated CI triggered on PRs & Pushes to `main` (lint, typecheck, unit/integration tests, production docker build) | `LAB5-ISSUE-04` |
-| | | `C-02` | Enforced Branch Protection & Merge Gate on `main` (Requires `test-and-docker` passing check, blocks failed builds) | `LAB5-ISSUE-06` |
-| **Docker & Configuration** | **20 pts** | `C-03` | Production Multi-Stage Dockerfile (non-root `node` user, dumb-init/exec entrypoint, port binding via `$PORT`) & Local Compose | `LAB5-ISSUE-03` |
-| | | `R-01` | Cloud-ready Health (`/api/health`) and Readiness (`/api/ready` with DB ping `SELECT 1`) endpoints | `LAB5-ISSUE-02` |
-| | | `R-02` | Unified Express production server serving client bundle from `client/dist` on `0.0.0.0:$PORT` | `LAB5-ISSUE-02` |
-| **GCP & Persistence** | **35 pts** | `C-04` | Idempotent GCP provisioning via Cloud Shell (`deploy.sh`), Cloud SQL PostgreSQL 16, Secret Manager, Cloud Run Service & Job | `LAB5-ISSUE-05` |
-| | | `C-05` | Verified Database Persistence across container restarts, new revisions, and rollbacks (`crustcraft-pg`) | `LAB5-ISSUE-08` |
-| | | `R-03` | Zero Plaintext Secrets in source code / repo; Least-privilege Secret Manager bindings per secret | `LAB5-ISSUE-01`, `05` |
-| | | `R-04` | Budget alerts configured at $250 ($25, $50, $125, $225 thresholds) with zero-cost guardrails | `LAB5-ISSUE-01` |
-| **Release & Rollback** | **15 pts** | `C-06` | Automated CD deployment via WIF on merge to `main` with immutable image tag digest synchronization | `LAB5-ISSUE-07` |
-| | | `R-05` | Manual rollback workflow via `workflow_dispatch` skipping CI/build and reverting image tag cleanly | `LAB5-ISSUE-08` |
-| **Documentation & Report** | — | `R-06` | Complete `deployment.md` architecture guide and final submission PDF report (`lab5_sec<sec>_<group>.pdf`) | `LAB5-ISSUE-09` |
+| **1. CI and quality gate** | **30 pts** | `C-01` (`R-05`), `C-02` (`R-06`), `R-09`, `R-10` | Automated CI passes on valid PRs; failing test blocks merge via `protect-main` ruleset | `LAB5-ISSUE-04`, `06` |
+| **2. Docker and reproducible configuration** | **20 pts** | `C-03` (`R-01`, `R-02`), `.env.example`, `deployment.md` | Clean clone builds and runs with only `.env.example` values; multi-stage Dockerfile | `LAB5-ISSUE-02`, `03` |
+| **3. GCP deployment and persistence** | **35 pts** | `C-04` (`R-03`), `C-05` (`R-04`), Secret Manager, WIF | Public URL domain workflow works; data survives restart and full pipeline redeploy | `LAB5-ISSUE-01`, `05`, `08` |
+| **4. Repeatable release pipeline** | **15 pts** | `C-06` (`R-07`–`R-10`), Release Procedure | Reviewed changes go staging -> main -> deployed; commit SHA & image digest trace cleanly | `LAB5-ISSUE-07`, `08`, `09` |
+
+### 2.2 Exact Handout Requirements (`R-01` to `R-12`)
+
+- **`R-01`:** Package with Docker; fresh build from clean clone produces working container.
+- **`R-02`:** Read every setting from environment; document in `.env.example` & `docs/labs/lab-05/deployment.md`; commit no real secret.
+- **`R-03`:** Deploy on GCP at a public URL; domain workflow works through UI, API, and DB.
+- **`R-04`:** Store data in persistent DB; data survives application restart and redeploy.
+- **`R-05`:** Run build and automated tests on every relevant PR with meaningful test results.
+- **`R-06`:** Make passing check required so failed check blocks merge; demonstrate with failing PR from temporary branch without breaking released app.
+- **`R-07`:** Deploy accepted releases from `main` through repeatable pipeline (reviewed change -> CI -> merge -> deploy).
+- **`R-08`:** Identify commit of each release (tag or commit SHA) and document repeatable release procedure.
+- **`R-09`:** Use Issues, project board, feature/fix branches, PRs into `lab-5-staging` reviewed by teammate (specific check/question/finding/reason; no self-approval), and release PR from `lab-5-staging` into `main`.
+- **`R-10`:** Label all Lab 5 Issues and PRs with `lab5`; preserve history (never delete or rewrite commits, contract revisions, or CI runs).
+- **`R-11`:** Both members (`@meebotsompurin-stack` and `@poom2548`) participate across all areas; record contributions in Issues, commits, and PRs.
+- **`R-12`:** Make repository public and keep it public until grading ends.
+
+### 2.3 Exact Handout Checks (`C-01` to `C-06`)
+
+- **`C-01` (`R-05`):** Normal PR runs build and all automated tests, and they pass (Evidence: CI run link & test summary).
+- **`C-02` (`R-06`):** PR from temporary branch with one failing test cannot be merged (Evidence: PR link, failed check, blocked merge screenshot).
+- **`C-03` (`R-01`, `R-02`):** Fresh clone builds and runs with only `.env.example` values filled in (Evidence: commands & output).
+- **`C-04` (`R-03`):** Domain workflow works on public URL: sign in, main business action, and one rule rejection or access restriction (Evidence: screenshots with URL visible).
+- **`C-05` (`R-04`):** Record created before a restart and a redeploy is still there afterwards (Evidence: before & after screenshots).
+- **`C-06` (`R-07`–`R-10`):** Reviewed change goes from `lab-5-staging` into `main` and is deployed, and running revision matches its commit (Evidence: PR links, pipeline run, GCP revision).
+
+*หมายเหตุ: กลไก Zero-Downtime Manual Rollback (`LAB5-ISSUE-08`) จัดเป็น **Recommended Practice** (ตาม Handout §5) ที่ช่วยเสริมความแข็งแกร่งของ `C-05` (`R-04`) และ `R-08`*
 
 ---
 
@@ -50,12 +71,12 @@
       ▼                                      ▼                                      ▼
 [ Artifact Registry ]               [ Secret Manager ]                      [ Cloud Run Job ]
  asia-southeast1-docker.pkg.dev        - crustcraft-database-url              crustcraft-migrate
- repo: crustcraft                      - crustcraft-admin-password            (prisma migrate deploy
- image: crustcraft:<commit-sha>        - crustcraft-demo-password              + non-destructive seed)
-      │                                      │                                      │
-      │ (pull image digest)                  │ (mount env var)                      │ (run before service)
-      └───────────────────────────────┐      │      ┌───────────────────────────────┘
-                                      ▼      ▼      ▼
+ repo: crustcraft                      - crustcraft-jwt-secret                (prisma migrate deploy
+ image: crustcraft:<commit-sha>        - crustcraft-admin-password             + non-destructive seed)
+      │                                - crustcraft-demo-password                    │
+      │ (pull image digest)                  │                                       │ (run before service)
+      └───────────────────────────────┐      │ (mount env var)       ┌───────────────┘
+                                      ▼      ▼                       ▼
                                 [ Cloud Run Service ]
                                   Service: crustcraft
                                   Image: crustcraft@sha256:...
@@ -72,59 +93,99 @@
 ```
 
 ### Technical Parameters & Resource Naming Convention
-- **GCP Project ID:** `cpe334-crustcraft` (or designated lab project)
+- **GCP Project ID:** `cpe334-crustcraft` (หรือ Project ที่สร้างขึ้น)
 - **Region:** `asia-southeast1` (Singapore)
 - **Artifact Registry Repository:** `crustcraft`
 - **Cloud Run Service Name:** `crustcraft`
 - **Cloud Run Migration Job:** `crustcraft-migrate`
-- **Cloud SQL Instance:** `crustcraft-pg` (PostgreSQL 16, `db-f1-micro`, 10GB SSD)
+- **Cloud SQL Instance:** `crustcraft-pg` (PostgreSQL 16, `db-f1-micro`, Enterprise Edition, 10GB SSD)
 - **Database Name / User:** `crustcraft` / `crustcraft`
-- **Runtime Service Account:** `crustcraft-runner@cpe334-crustcraft.iam.gserviceaccount.com` (Least Privilege: `roles/cloudsql.client`, Secret Manager secretAccessor on individual secrets)
-- **Deployer Service Account:** `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` (Used by GitHub Actions WIF)
+- **Runtime Service Account:** `crustcraft-runner@cpe334-crustcraft.iam.gserviceaccount.com` (Least Privilege: `roles/cloudsql.client`, Secret Manager secretAccessor เฉพาะแต่ละ Secret)
+- **Deployer Service Account:** `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` (สำหรับ GitHub Actions WIF)
 - **WIF Pool / Provider:** `github-actions` / `github-main`
-- **GitHub Environment:** `demo` (Secrets & Variables scoped strictly to `main`)
+- **GitHub Environment:** `demo` (ตัวแปรและ Secret ถูกจำกัดเฉพาะ Branch `main`)
 
 ---
 
-## 4. Cost Control & Safety Guardrails (Zero-Overrun Policy)
+## 4. Cost Control & Safety Guardrails (Zero-Overrun & Continuous Availability Policy)
 
-1. **Cloud SQL Instance Tier:** กำหนดชัดเจนเป็น `db-f1-micro` พร้อม `--edition=enterprise` (Lowercase ตาม Requirement)
-2. **Storage Auto-increase Disabled:** บังคับปิด Storage Auto-increase ใน `deploy.sh` เพื่อป้องกัน disk ขยายตัวเกิน 10GB อัตโนมัติ (`--no-storage-auto-increase`)
-3. **Budget Alert Thresholds:** ตั้ง Budget Alert $250 พร้อมแจ้งเตือน 10% ($25), 20% ($50), 50% ($125), และ 90% ($225) สู่อีเมลของสมาชิกทีมทั้งสองคน
-4. **Cloud SQL Pausing/Teardown:** หลังเสร็จสิ้นการสาธิตหรือทดสอบ ต้องทำการ Pause Cloud SQL หรือรัน `deploy/teardown.sh` ทันทีเพื่อหยุด Billing
+1. **Continuous Availability Rule (CRITICAL - Handout §12 & §3):**
+   - **ห้ามทำการ Pause หรือ Teardown ทรัพยากร Cloud SQL และ Cloud Run ทันทีหลังจากการทดสอบหรือจับภาพหน้าจอเด็ดขาด**
+   - ผู้สอนและทีม Partner (Lab 6 UAT) ต้องสามารถเข้าถึงระบบผ่าน Public URL ได้ตลอดเวลา
+   - **Episode 9 (Pause):** ใช้งานเฉพาะระหว่าง Session ที่ไม่มีการใช้งานจริง หรือกรณีฉุกเฉิน และต้อง Unpause ทันทีเมื่อเข้าสู่ช่วงตรวจงานหรือทดสอบ
+   - **Episode 10 (Teardown):** ห้ามทำโดยเด็ดขาดจนกว่าผู้สอนจะประกาศสิ้นสุดการตรวจให้คะแนนรายวิชาอย่างเป็นทางการ เพราะ Teardown จะทำลายฐานข้อมูลและประวัติการทำงานอย่างถาวร
+2. **Cloud SQL Instance Tier:** กำหนดชัดเจนเป็น `db-f1-micro` พร้อม `--edition=enterprise` (Lowercase ตาม Requirement)
+3. **Storage Auto-increase Disabled:** บังคับปิด Storage Auto-increase ใน `deploy.sh` เพื่อป้องกัน disk ขยายตัวเกิน 10GB อัตโนมัติ (`--no-storage-auto-increase`)
+4. **Budget Alert Thresholds:** ตั้ง Budget Alert $250 พร้อมแจ้งเตือน 4 ระดับ คือ 10% ($25), 20% ($50), 50% ($125), และ 90% ($225) สู่อีเมลของสมาชิกทีมทั้งสองคน โดยต้องสร้าง Budget ก่อนสร้างทรัพยากรที่คิดค่าบริการใดๆ
 5. **Secret Redaction:** สคริปต์ `deploy.sh` และ CI logs ทั้งหมดต้องทำการ Mask/Redact flags `--password=...` และไม่พิมพ์ Plaintext Password ออกมาเด็ดขาด
 
 ---
 
-## 5. Git Branching & Execution Roadmap
+## 5. Git Branching Model & Release Workflow (`R-09`, `R-10`)
 
-เพื่อความปลอดภัยสูงสุดและไม่กระทบประวัติ Git เดิมของ Sprint 1:
-- Feature Work ทั้งหมดของ Lab 5 จะสร้างจาก Branch `sprint-1-staging` หรือ `main`
-- ใช้ Branch Naming Scheme ตามข้อกำหนด:
-  - `refactor/lab5-issue-02-cloud-ready`
-  - `build/lab5-issue-03-docker`
-  - `ci/lab5-issue-04-pr-checks`
-  - `deploy/lab5-issue-05-first-gcp-deployment`
-  - `sec/lab5-issue-06-wif-and-merge-gate`
-  - `ci/lab5-issue-07-auto-deploy-pipeline`
-  - `test/lab5-issue-08-persistence-and-rollback`
-  - `docs/lab5-issue-09-docs-and-pdf-submission`
-- ทุก Pull Request ต้องผ่านการรีวิวแบบ Cross-Pair และผ่าน Quality Gate ก่อน Squash/Rebase เข้าสู่ `sprint-1-staging` และ `main` ตามลำดับ
+เพื่อรักษาประวัติ Git ดั้งเดิมและให้เป็นไปตาม Handout `R-09` และ `R-10` อย่างเคร่งครัด:
+
+```
+[Issue labeled 'lab5']
+       │
+       ▼ (create branch from lab-5-staging)
+[feature/fix/ci/docs branch]
+       │
+       ▼ (Pull Request + Teammate Review & Approval)
+[lab-5-staging branch]  <─── (Integration Branch: CI runs on every PR)
+       │
+       ▼ (Release PR + Final Verification)
+[main branch]           <─── (Protected Release Gate: CI must pass; triggers CD via WIF)
+```
+
+1. **Single Integration Branch (`lab-5-staging`):**
+   - ทุก Feature/Fix branch ของ Lab 5 จะแตกกิ่งออกจาก `lab-5-staging` เท่านั้น
+   - ส่ง Pull Request เข้าสู่ `lab-5-staging` โดยต้องได้รับการ Review และ Approve จากเพื่อนร่วมทีม (`@meebotsompurin-stack` หรือ `@poom2548`) พร้อมระบุข้อสังเกต/คำถามที่เป็นรูปธรรม (ห้าม Self-Approval ตาม `R-09`)
+2. **Release Promotion to `main`:**
+   - เมื่อชุดฟีเจอร์ใน `lab-5-staging` ผ่านการทดสอบเรียบร้อย จะเปิด Release PR จาก `lab-5-staging` เข้าสู่ `main`
+   - เฉพาะการ Merge เข้าสู่ `main` เท่านั้นที่จะ Trigger การ Deploy สู่ Google Cloud Run (`R-07`)
+3. **Branch Protection & Merge Gate (`protect-main`):**
+   - Ruleset `protect-main` มีสถานะ Enforcement = **Active**, Bypass list = **Empty**
+   - กำหนดให้ต้องผ่าน Status Check: **`test-and-docker`** (ตรงกับ Job ID ใน `ci-docker.yml`)
+   - สำหรับการสาธิต `C-02` จะใช้กิ่งชั่วคราว `test/prove-gate` เปิด PR ตรงเข้าหา `main` เพื่อพิสูจน์การบล็อก แล้ว **Close PR ทันทีโดยไม่ Merge และลบกิ่งทิ้ง**
+4. **History Preservation (`R-10`):**
+   - ห้าม Force-push (`git push --force`) หรือ Rebase กิ่งที่เผยแพร่แล้ว
+   - ห้ามลบ Commit, Contract Revision, หรือ CI Runs เพื่อรักษาประวัติการทำงานไว้ให้ผู้สอนตรวจสอบ
 
 ---
 
-## 6. Directory Map: `plan/LAB5-issues/`
+## 6. Migration Strategy: SQLite to PostgreSQL 16 (`B3`)
+
+สถาปัตยกรรมเดิมของ Sprint 1 ใช้ SQLite เป็น Local Database ใน Lab 5 จะทำการยกระดับสู่ PostgreSQL 16 เต็มรูปแบบ:
+1. ปรับปรุง `prisma/schema.prisma` datasource `provider = "postgresql"`
+2. สร้าง PostgreSQL Migration Baseline ใหม่ภายใต้ `prisma/migrations/`
+3. ปรับปรุง Seed Script (`prisma/seed.ts`) ให้ทำงานแบบ Idempotent (`upsert`) บน PostgreSQL
+4. รองรับการรัน Local Dev ด้วย `docker-compose.yml` (PostgreSQL 16 Alpine container) และ CI test container
+5. เอกสารสถาปัตยกรรม `docs/labs/lab-05/deployment.md` จะบันทึกการเปลี่ยนแปลงและเหตุผลทางเทคนิคอย่างครบถ้วน
+
+---
+
+## 7. AI Agent & Secret Safety Rules (Mandatory across ALL Issues)
+
+1. **No Autonomous Cloud Operations:** ห้าม AI Agent รันคำสั่ง `gcloud`, แก้ไข IAM, เปลี่ยนแปลง Billing, หรือจัดการ Database บน Cloud โดยปราศจากการตรวจสอบและสั่งการจากมนุษย์
+2. **Read Before Run:** สมาชิกทีมต้องอ่านและทำความเข้าใจคำสั่ง shell ทุกคำสั่งก่อนสั่ง execute บน Cloud Shell หรือเครื่อง local
+3. **No Secret Ingestion:** ห้ามนำ Production Password, Connection String จริง, หรือ Private Key วางลงใน AI Prompt หรือบันทึกลงใน Markdown / Screenshot เด็ดขาด
+4. **Ephemeral Test Values Only:** อนุญาตให้ใช้เฉพาะค่าจำลองสำหรับการทดสอบบน CI (เช่น `crustcraft_test_password`) เท่านั้น
+
+---
+
+## 8. Directory Map: `plan/LAB5-issues/`
 
 ```
 plan/LAB5-issues/
 ├── LAB5-ISSUE-00-master-plan.md              (This document - Architecture & Master Plan)
-├── LAB5-ISSUE-01-gcp-setup-and-budget.md     (Episode 1: Project, IAM, Budget Alerts)
-├── LAB5-ISSUE-02-cloud-ready-app.md          (Episode 2: /api/ready, Express static serving)
-├── LAB5-ISSUE-03-docker-containerization.md  (Episode 3: Multi-stage Dockerfile & Compose)
-├── LAB5-ISSUE-04-pr-ci-workflow.md           (Episode 4: ci-docker.yml & offline tests)
-├── LAB5-ISSUE-05-first-gcp-deployment.md     (Episode 5: deploy.sh & Cloud Shell initial run)
+├── LAB5-ISSUE-01-gcp-setup-and-budget.md     (Episode 1: Project, IAM, Budget Alerts, R-10..12)
+├── LAB5-ISSUE-02-cloud-ready-app.md          (Episode 2: /api/ready, SQLite->PostgreSQL 16 Migration)
+├── LAB5-ISSUE-03-docker-containerization.md  (Episode 3: Multi-stage Dockerfile, Compose, C-03)
+├── LAB5-ISSUE-04-pr-ci-workflow.md           (Episode 4: ci-docker.yml, offline deploy tests, C-01)
+├── LAB5-ISSUE-05-first-gcp-deployment.md     (Episode 5: deploy.sh execution, Cloud Run initial run)
 ├── LAB5-ISSUE-06-wif-and-merge-gate.md       (Episode 6: WIF, GitHub env, Merge Gate C-02)
-├── LAB5-ISSUE-07-auto-deploy-pipeline.md     (Episode 7: deploy.yml & auto release pipeline)
-├── LAB5-ISSUE-08-persistence-and-rollback.md (Episode 8: Persistence test & rollback C-05)
-└── LAB5-ISSUE-09-docs-and-pdf-submission.md  (Episode 9: deployment.md & final PDF report)
+├── LAB5-ISSUE-07-auto-deploy-pipeline.md     (Episode 7: deploy.yml, auto release pipeline, C-06)
+├── LAB5-ISSUE-08-persistence-and-rollback.md (Episode 8: Persistence test C-05 & Rollback protocol)
+└── LAB5-ISSUE-09-docs-and-pdf-submission.md  (Episode 9: deployment.md, 5-part Evidence PDF report)
 ```

@@ -1,5 +1,5 @@
 # LAB5-ISSUE-07 — Automated CD Deployment Pipeline (`deploy.yml`) & Live Release Cycle
-## Episode 7: Continuous Deployment Pipeline & Revision Digest Synchronization
+## Episode 7: Continuous Deployment Pipeline, Revision Digest Synchronization & Two-Release Verification (`C-06`)
 
 ---
 
@@ -7,48 +7,59 @@
 |---|---|
 | **ID / Title** | `LAB5-ISSUE-07` — Automated CD Deployment Pipeline (`deploy.yml`) & Live Release Cycle |
 | **Type** | `ci` / `deploy` |
-| **Branch** | `ci/lab5-issue-07-auto-deploy-pipeline` |
+| **Branch** | `ci/lab5-issue-07-auto-deploy-pipeline` (branch from `lab-5-staging`) |
 | **Depends on** | `LAB5-ISSUE-06-wif-and-merge-gate.md` |
-| **Lab 5 Rubric** | Traceability `C-06` (Automated CD Pipeline & Digest Sync), `C-01` |
+| **Lab 5 Rubric** | Category 4: Repeatable release pipeline (15 pts) — `C-06` (`R-07`–`R-10`), `R-08` |
 | **Primary Owners**| Purin Mebotsom (`@meebotsompurin-stack`), Saksorn Buranatananun (`@poom2548`) |
+| **Issue Labels** | `lab5`, `cd`, `release`, `automation` |
 
 ---
 
 ## 1. Objective
 
-สร้างและติดตั้ง Automated CD Pipeline ผ่านไฟล์ `.github/workflows/deploy.yml` เพื่อให้ทุกการ Merge หรือ Push สู่ Branch `main` เกิดการ Deploy สู่ Google Cloud Run อัตโนมัติ โดยปราศจากการแทรกแซงแบบ Manual:
-1. เรียกใช้ Reusable CI Workflow (`ci-docker.yml`) เป็น Gate แรก หาก CI ล้มเหลวจะไม่มีการแตะต้องระบบ Production
+สร้างและติดตั้ง Automated CD Pipeline ผ่านไฟล์ `.github/workflows/deploy.yml` เพื่อให้ทุกการ Merge เข้าสู่ Branch `main` เกิดการ Deploy สู่ Google Cloud Run อัตโนมัติ โดยปราศจากการแทรกแซงแบบ Manual ตามมาตรฐาน `R-07`, `R-08`, และ `C-06`:
+1. เรียกใช้ Reusable CI Workflow (`ci-docker.yml`) เป็น Quality Gate หาก CI ล้มเหลวจะไม่มีการแตะต้องระบบ Production
 2. ล็อกอินเข้าสู่ GCP ผ่าน Workload Identity Federation (WIF) ด้วยสิทธิ์ของ `crustcraft-deployer`
-3. สั่ง Build Docker Image บน GitHub Actions Runner และ Push ตรงสู่ Artifact Registry โดยแท็กด้วย Commit SHA เต็ม 40 ตัวอักษร
-4. รัน `deploy/release.sh` เพื่อ Resolve Image Tag ไปสู่ **Immutable `@sha256` Image Digest** รัน Cloud Run Migration Job (`crustcraft-migrate`) ให้เสร็จสิ้น แล้วอัปเดต Cloud Run Service (`crustcraft`)
-5. ดำเนินการรัน Smoke Test ตรวจสอบ Service URL ทันที
-6. บันทึกและทดสอบวงรอบการปล่อย Release สองเวอร์ชัน (Release A และ Release B) เพื่อพิสูจน์การทำงานของ Pipeline อัตโนมัติ
+3. สั่ง Build Docker Image บน Runner และ Push สู่ Artifact Registry โดยติดแท็กด้วย Commit SHA เต็ม 40 ตัวอักษร
+4. รัน `deploy/release.sh` เพื่อ Resolve Image Tag ไปสู่ **Immutable `@sha256` Image Digest** รัน Cloud Run Migration Job (`crustcraft-migrate`) และอัปเดต Cloud Run Service (`crustcraft`)
+5. รัน Smoke Test ตรวจสอบ Service URL ทันที
+6. **ดำเนินวงรอบการปล่อย Release สองรอบ (Release A และ Release B) ผ่านกระบวนการ `lab-5-staging -> main` (`B2`, `M8`):**
+   - ทั้ง Release A และ Release B ต้องผ่านเส้นทาง: `feature branch` -> `PR into lab-5-staging (peer reviewed)` -> `Release PR from lab-5-staging into main`
+   - พิสูจน์การจับคู่ระหว่าง Commit SHA, Immutable `@sha256` Image Digest, และ Cloud Run Active Revision
 
 ---
 
 ## 2. Acceptance Criteria
 
-- [ ] **AC-LAB5-07-01:** ไฟล์ `.github/workflows/deploy.yml` ได้รับการตั้งค่าตามสเปก:
-  - Trigger: `push` on branch `main` และ `workflow_dispatch` (มี input `image_tag` สำหรับ rollback)
-  - Concurrency group `deploy-demo` พร้อม `cancel-in-progress: false` เพื่อป้องกันการยกเลิกระหว่าง DB Migration
-  - Environment: `demo` (เชื่อมโยงกับ WIF variables)
-- [ ] **AC-LAB5-07-02:** Workflow ประกอบด้วย 2 Jobs:
-  - **Job 1 (`test`):** เรียก Reusable Workflow `./.github/workflows/ci-docker.yml` (ข้ามเฉพาะตอนที่เป็น Rollback)
-  - **Job 2 (`deploy`):** ทำงานต่อเมื่อ `test` ผ่านสำเร็จ (`needs: test`), ตรวจสอบความถูกต้องของค่า WIF, Build & Push Image, รัน `deploy/release.sh`, และรัน `smoke_test.py`
-- [ ] **AC-LAB5-07-03:** สคริปต์ `deploy/release.sh` มีกลไกป้องกันความผิดพลาด:
-  - Resolve Commit SHA Tag เป็น Fully Qualified `@sha256:...` Image Digest เสมอ (`C-06`)
-  - รัน `gcloud run jobs execute crustcraft-migrate --wait` ก่อนการอัปเดต Service หาก Job ล้มเหลว สคริปต์จะ Exit ทันทีและไม่แตะต้อง Service
-  - สั่ง `gcloud run services update-traffic crustcraft --to-latest` เพื่อส่ง Traffic 100% ไปยัง Revision ใหม่ล่าสุด
-- [ ] **AC-LAB5-07-04 (Release A Execution):**
-  - ดำเนินการ Merge PR เข้าสู่ `main` ถือเป็น **Release A**
+- [ ] **AC-LAB5-07-01 (Deployment Workflow Structure):**
+  - Workflow `.github/workflows/deploy.yml`:
+    - Trigger: `push` on branch `main` และ `workflow_dispatch` (พร้อม input `image_tag` สำหรับ Rollback)
+    - Concurrency group `deploy-demo` พร้อม `cancel-in-progress: false` (ป้องกันการยกเลิกระหว่าง DB Migration)
+    - Environment: `demo` (เชื่อมโยงกับ WIF variables)
+- [ ] **AC-LAB5-07-02 (Two-Job Pipeline Architecture):**
+  - **Job 1 (`test`):** เรียก Reusable Workflow `./.github/workflows/ci-docker.yml`
+  - **Job 2 (`deploy`):** ทำงานต่อเมื่อ `test` สำเร็จ (`needs: test`), ตรวจสอบ WIF settings, Build & Push Image, รัน `deploy/release.sh` และ `deploy/smoke_test.py`
+- [ ] **AC-LAB5-07-03 (Immutable Digest Resolution & Migration):**
+  - สคริปต์ `deploy/release.sh` ทำการ Resolve Commit SHA Tag ไปสู่ Fully Qualified `@sha256:...` Image Digest เสมอ (`C-06`)
+  - รัน `gcloud run jobs execute crustcraft-migrate --wait` ก่อนการอัปเดต Service หาก Migration ล้มเหลว จะยุติการทำงานทันทีโดยไม่แตะต้อง Service
+  - สั่ง `gcloud run services update-traffic crustcraft --to-latest` เพื่อส่ง Traffic 100% ไปยัง Revision ใหม่
+- [ ] **AC-LAB5-07-04 (Release Identification & Smoke Test Security `M8`):**
+  - แสดง Commit SHA เต็ม 40 ตัวอักษร และ Image Digest ใน GitHub Actions Step Summary
+  - สามารถตรวจสอบ Commit ของ Revision ที่กำลังรันอยู่ได้ผ่านคำสั่ง `gcloud` และหน้า Console
+  - หากเปิดใช้ Authenticated Smoke Test (`SMOKE_EMAIL` / `SMOKE_PASSWORD`) ต้องใช้บัญชีทดสอบระดับต่ำสุด (`CUSTOMER`) เท่านั้น — **ห้ามใช้บัญชี Operator/Admin หรือรหัสผ่าน Demo ส่วนกลางเด็ดขาด**
+- [ ] **AC-LAB5-07-05 (Execution of Release A `B2`, `C-06`):**
+  - Merge ชุดฟีเจอร์เริ่มต้นจาก `lab-5-staging` เข้าสู่ `main` ผ่าน Release PR
   - GitHub Actions รัน Auto-deploy สำเร็จ
   - บันทึก Commit SHA A, Image Digest A, และ Cloud Run Revision Name A
-- [ ] **AC-LAB5-07-05 (Release B Execution):**
-  - ทำการแก้ไข UI เล็กน้อยที่มองเห็นได้ชัดเจน (เช่น ปรับแต่ง Footer หรือข้อความหัวเว็บใน `client/src/App.tsx` หรือ `Navbar.tsx`)
-  - เปิด PR จาก branch `feat/release-b-banner` ตรวจสอบ Merge Gate แล้ว Merge เข้าสู่ `main`
-  - GitHub Actions รัน Auto-deploy สำเร็จโดยอัตโนมัติ
+- [ ] **AC-LAB5-07-06 (Execution of Release B `B2`, `C-06`):**
+  - สร้าง Feature Branch จาก `lab-5-staging` เช่น `feat/release-b-banner`
+  - ทำการแก้ไข UI เล็กน้อยที่มองเห็นได้ชัดเจนบนหน้าเว็บ (เช่น ปรับปรุง Header หรือ Footer ข้อความใน `client/src/App.tsx`)
+  - เปิด PR เข้าสู่ `lab-5-staging` ให้เพื่อนรีวิวและอนุมัติ
+  - เปิด Release PR จาก `lab-5-staging` เข้าสู่ `main`
+  - สังเกตการณ์ Auto-deploy สำเร็จโดยสมบูรณ์
   - บันทึก Commit SHA B, Image Digest B, และ Cloud Run Revision Name B
-- [ ] **AC-LAB5-07-06:** ตรวจสอบหน้าเว็บสด (Live URL) ต้องเห็นการเปลี่ยนแปลงของ Release B อย่างถูกต้อง
+- [ ] **AC-LAB5-07-07 (Live Verification of Release B):**
+  - เปิดเบราว์เซอร์เข้าสู่ Public Service URL ตรวจสอบว่าเห็นการเปลี่ยนแปลงของ Release B อย่างชัดเจน
 
 ---
 
@@ -153,17 +164,38 @@ jobs:
 
 ---
 
-## 4. Release Tracking Table (Evidence Collection)
+## 4. Release Tracking Table (Evidence Collection for `C-06`)
 
-| Release Stage | Commit SHA (40 chars) | Image Digest (`@sha256:...`) | Cloud Run Revision | Live URL Status |
-|---|---|---|---|---|
-| **Release A** | `[Record SHA A]` | `[Record Digest A]` | `crustcraft-00001-...` | PASS (Initial Deploy) |
-| **Release B** | `[Record SHA B]` | `[Record Digest B]` | `crustcraft-00002-...` | PASS (UI Banner Update) |
+| Release Stage | Branching Route | Commit SHA (40 chars) | Image Digest (`@sha256:...`) | Cloud Run Revision | Live URL Status |
+|---|---|---|---|---|---|
+| **Release A** | `lab-5-staging -> main` | `[Record SHA A]` | `[Record Digest A]` | `crustcraft-00001-...` | PASS (Initial Pipeline Deploy) |
+| **Release B** | `feat/banner -> lab-5-staging -> main` | `[Record SHA B]` | `[Record Digest B]` | `crustcraft-00002-...` | PASS (UI Banner Update) |
 
 ---
 
-## 5. Files Allowed (Whitelist)
+## 5. Identifying the Running Commit (`R-08` Procedure)
+
+ผู้ประเมินหรือทีมงานสามารถตรวจสอบ Commit SHA ที่กำลังรันอยู่บน Cloud Run ได้จาก 3 แหล่ง:
+1. **GitHub Actions Step Summary:** แสดง 40-char Commit SHA คู่กับ Image Digest
+2. **Cloud Run Revision Description:** ตรวจสอบ Image URL ใน Revision Details
+3. **CLI Command:**
+   ```bash
+   gcloud run services describe crustcraft --region=asia-southeast1 --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
+   ```
+
+---
+
+## 6. Files Allowed (Whitelist)
 ```
 .github/workflows/deploy.yml
 deploy/release.sh
+docs/labs/lab-05/deployment.md
 ```
+
+---
+
+## 7. AI Agent & Secret Safety Rules (Strict Policy)
+
+1. ❌ **ห้ามรันการ Deploy สู่ Production จาก Local Machine หรือ AI Agent** ทุกการ Deploy ต้องผ่าน GitHub Actions WIF บนกิ่ง `main` เท่านั้น
+2. ❌ **ห้ามใช้ Credentials ของ Admin/Operator ในการรัน Smoke Test อัตโนมัติ** ให้ใช้เฉพาะบัญชี Customer สิทธิ์ต่ำสุด
+3. ❌ **ห้าม Force-push ทับประวัติ Release ใน Branch `main` เด็ดขาด**
