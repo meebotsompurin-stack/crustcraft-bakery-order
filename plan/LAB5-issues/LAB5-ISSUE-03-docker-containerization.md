@@ -30,18 +30,22 @@
 
 - [ ] **AC-LAB5-03-01 (Multi-Stage Production Dockerfile):**
   - Base Image ใช้ **`node:22-alpine`** ทั้งหมด (`S2`)
+  - **Workspace Lockfile Safety:** ต้องทำการคัดลอกทั้ง `server/package.json` และ `client/package.json` ก่อนรัน `npm ci --workspace=server` เพื่อป้องกัน Root lockfile workspace parsing error และต้องตรวจสอบด้วยการรัน `docker build` จริงให้ผ่านสมบูรณ์
   - **Stage 1 (`client-builder`):** ติดตั้ง dependencies, build React Vite SPA ออกมาเป็น `client/dist`
   - **Stage 2 (`server-builder`):** ติดตั้ง OpenSSL (สำหรับ Prisma บน Alpine), run `prisma generate`, compile TypeScript สู่ `server/dist`
   - **Stage 3 (`production`):** คัดลอกเฉพาะ production dependencies, runtime artifacts, ไฟล์ client bundle, และชุดคำสั่ง Prisma Migration/Seed
   - รัน Container ด้วยผู้ใช้สิทธิ์ต่ำ **`USER node`**
   - ไม่ใช้ `dumb-init` โดยไม่จำเป็น ให้ใช้ Shell Entrypoint (`docker-entrypoint.sh`) ที่มีคำสั่ง `exec "$@"` เพื่อรับส่งสัญญาณ `SIGTERM` / `SIGINT` ให้ Node process โดยตรง (`S3`)
 - [ ] **AC-LAB5-03-02 (Prisma CLI & Migration Job Capability in Image `S3`):**
-  - เนื่องจากคำสั่ง `npm ci --omit=dev` จะตัด `devDependencies` ซึ่งรวมถึง `prisma` CLI ออกไป ทำให้คำสั่งรัน Migration ล้มเหลว ดังนั้นใน Runtime Image จะต้องทำการติดตั้ง Prisma CLI อย่างชัดเจน (เช่น `RUN npm install -g prisma`)
+  - เนื่องจากคำสั่ง `npm ci --omit=dev` จะตัด `devDependencies` ซึ่งรวมถึง `prisma` และ `tsx` ออกไป ทำให้คำสั่งรัน Migration และ Seed (`npm run seed`) ล้มเหลว ดังนั้นใน Runtime Image จะต้องทำการติดตั้ง Prisma CLI แบบ Pin Version และ `tsx` ไว้อย่างชัดเจน:
+    ```dockerfile
+    RUN npm install -g prisma@5.22.0 tsx
+    ```
   - Runtime Image ต้องมีไฟล์ `prisma/schema.prisma`, `prisma/migrations/**`, `prisma/seed.ts`, และ `prisma` CLI พร้อมรันคำสั่ง:
     ```bash
     npx prisma migrate deploy && npm run seed
     ```
-    สำหรับใช้ใน Cloud Run Job (`crustcraft-migrate`) ได้อย่างสมบูรณ์โดยไม่ขาด CLI tool
+    สำหรับใช้ใน Cloud Run Job (`crustcraft-migrate`) ได้อย่างสมบูรณ์โดยไม่ขาด CLI tool และ TypeScript execution engine
 - [ ] **AC-LAB5-03-03 (Strict `.dockerignore`):**
   - บล็อกไม่ให้ไฟล์ sensitive หรือ dev caches หลุดเข้าไปใน Image: `**/node_modules`, `**/dist`, `**/.env*`, `*.db*`, `test-results`, `playwright-report`, `gha-creds-*.json`, `.git`
 - [ ] **AC-LAB5-03-04 (Local Development with Docker Compose):**
@@ -86,6 +90,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 COPY package*.json ./
 COPY server/package*.json ./server/
+COPY client/package*.json ./client/
 COPY prisma/ ./prisma/
 RUN npm ci --workspace=server
 RUN npx prisma generate --schema=prisma/schema.prisma
@@ -97,8 +102,8 @@ FROM node:22-alpine AS production
 WORKDIR /app
 RUN apk add --no-cache openssl
 
-# Explicitly install Prisma CLI globally so migration job works even when devDependencies are omitted (S3)
-RUN npm install -g prisma
+# Explicitly install Prisma CLI pinned to 5.22.0 and tsx globally for migration and seed execution (S3)
+RUN npm install -g prisma@5.22.0 tsx
 
 # Set up non-root user and directories
 ENV NODE_ENV=production
@@ -108,6 +113,7 @@ EXPOSE 3000
 
 COPY package*.json ./
 COPY server/package*.json ./server/
+COPY client/package*.json ./client/
 RUN npm ci --omit=dev --workspace=server
 
 COPY --from=server-builder /app/prisma ./prisma
@@ -187,9 +193,6 @@ Dockerfile
 .dockerignore
 docker-compose.yml
 server/docker-entrypoint.sh
-server/Dockerfile
-client/Dockerfile
-client/nginx.conf
 docs/labs/lab-05/deployment.md
 ```
 

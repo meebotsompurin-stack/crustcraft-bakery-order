@@ -64,7 +64,10 @@
   - จัดเตรียม Root **`.env.example`** สำหรับ Monorepo ที่รวบรวมตัวแปรทั้งหมด (`DATABASE_URL`, `JWT_SECRET`, `PORT`, `NODE_ENV`, `VITE_API_URL`)
   - จัดเตรียม `server/.env.example` และ `client/.env.example`
   - ปราศจาก Plaintext Secret จริง (ใช้เฉพาะค่าตัวอย่าง เช่น `postgresql://user:password@localhost:5432/dbname`)
-- [ ] **AC-LAB5-02-07 (PR & Review Workflow `R-09`):**
+- [ ] **AC-LAB5-02-07 (Update `server/package.json` Database Scripts):**
+  - แก้ไขสคริปต์ใน `server/package.json` (`seed`, `test`, `dev` ฯลฯ) เพื่อนำการ Hardcode SQLite connection string เดิม (`file:./dev.db` และ `file:./test.db`) ออกทั้งหมด
+  - เปลี่ยนมาใช้การรับค่าจาก Environment Variable `DATABASE_URL` (PostgreSQL Connection String) ผ่าน `.env` หรือ Runtime Environment Injection เพื่อให้รองรับ PostgreSQL 16 ทั้งบน Local, CI, และ Cloud SQL
+- [ ] **AC-LAB5-02-08 (PR & Review Workflow `R-09`):**
   - เปิด Pull Request จาก `refactor/lab5-issue-02-cloud-ready` เข้าสู่ **`lab-5-staging`**
   - ให้เพื่อนร่วมทีมทำการ Review, ตรวจสอบ Code Changes และทดสอบ Local Run ก่อน Approve
 

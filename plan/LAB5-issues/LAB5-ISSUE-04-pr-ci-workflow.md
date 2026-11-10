@@ -50,7 +50,7 @@
     - `deploy/tests/test_smoke.py`
   - Step ตรวจสอบ Offline scripts รันผ่าน 100% โดยไม่ต้องต่อ GCP:
     ```bash
-    bash -n deploy/deploy.sh deploy/teardown.sh deploy/release.sh deploy/teardown.sh
+    bash -n deploy/deploy.sh deploy/teardown.sh deploy/release.sh
     bash deploy/tests/test_deploy_stub.sh
     bash deploy/tests/test_release_stub.sh
     python3 -m unittest discover -s deploy/tests -p 'test_smoke.py'
@@ -68,6 +68,9 @@
   - บันทึกทั้ง **ลิงก์ CI Run Link** และ **ภาพ Test Summary Output** เพื่อใช้ใน PDF Report Part 1
 - [ ] **AC-LAB5-04-07 (Dependabot Configuration):**
   - จัดทำ `.github/dependabot.yml` ติดตามอัปเดต `npm` และ `github-actions` ประจำสัปดาห์
+- [ ] **AC-LAB5-04-08 (Initial Release Promotion to `main` before `ISSUE-05`):**
+  - เมื่อ PR ของ Issue 04 เข้าสู่ `lab-5-staging` ผ่านการ Review และ Merge เรียบร้อยแล้ว ให้ทำการเปิด **Initial Release PR จาก `lab-5-staging` เข้าสู่ `main`** และ Merge ทันที
+  - เพื่อรับประกันว่าชุดไฟล์ในโฟลเดอร์ `deploy/` ทั้งหมด และ `.github/workflows/ci-docker.yml` มีอยู่บน Branch `main` อย่างสมบูรณ์ *ก่อน* ที่ `ISSUE-05` จะทำการ Checkout `main` บน Cloud Shell เพื่อรัน `deploy/deploy.sh`
 
 ---
 

@@ -9,7 +9,7 @@
 | **Type** | `test` / `infra` |
 | **Branch** | `test/lab5-issue-08-persistence-and-rollback` (branch from `lab-5-staging`) |
 | **Depends on** | `LAB5-ISSUE-07-auto-deploy-pipeline.md` |
-| **Lab 5 Rubric** | Category 3: GCP deployment and persistence (35 pts) — `C-05` (`R-04`), Category 4 — `R-08` |
+| **Lab 5 Rubric** | Category 3: GCP deployment and persistence (35 pts) — `C-05` (`R-04`), Recommended Practice (Rollback) |
 | **Primary Owners**| Purin Mebotsom (`@meebotsompurin-stack`), Saksorn Buranatananun (`@poom2548`) |
 | **Issue Labels** | `lab5`, `testing`, `persistence`, `rollback` |
 
@@ -21,7 +21,7 @@
 1. **พิสูจน์ความคงอยู่ของข้อมูล (Database Persistence `C-05` / `R-04`):** แสดงให้เห็นว่าข้อมูลคำสั่งซื้อที่สร้างขึ้นบนระบบ Production จะต้องคงอยู่อย่างสมบูรณ์ ไม่สูญหาย ครอบคลุม **ทั้ง 2 สภาวะ (`S6`):**
    - **(a) การ Restart แอปพลิเคชัน (Application Restart):** การจำลอง Container Scale-to-zero / New Revision Instance Restart หรือ Restart บน Local Compose
    - **(b) การ Redeploy ทั้งระบบ (Full Pipeline Redeploy / Rollback & Roll-forward):** การ Deploy ทับด้วย Revision ใหม่หรือการทำ Rollback
-2. **ปฏิบัติตามแนวปฏิบัติแนะนำ (Recommended Practice Handout §5):** ทดสอบกระบวนการทำ **Zero-Downtime Manual Rollback (`R-08`)** ผ่าน `workflow_dispatch` ข้ามขั้นตอน CI/Build/Migration (`SKIP CI/BUILD/MIGRATE`) เพื่อสลับ Revision กลับสู่ Release A อย่างรวดเร็ว
+2. **ปฏิบัติตามแนวปฏิบัติแนะนำ (Recommended Practice Handout §5):** ทดสอบกระบวนการทำ **Zero-Downtime Manual Rollback** ผ่าน `workflow_dispatch` ข้ามขั้นตอน CI/Build/Migration (`SKIP CI/BUILD/MIGRATE`) เพื่อสลับ Revision กลับสู่ Release A อย่างรวดเร็ว
 3. **Roll-forward กลับสู่ Release B:** นำระบบกลับสู่สถานะล่าสุดพร้อมรับการตรวจงาน
 4. **รักษาความต่อเนื่องของระบบ (`B1`):** Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.
 
@@ -35,10 +35,11 @@
   - สร้าง Order คำสั่งซื้อเบเกอรี่ใหม่ 1 รายการ (e.g., Sourdough Bread x 2 ชิ้น)
   - บันทึกภาพหน้าจอ Order ในหน้า "My Orders" พร้อมแสดง Order ID และ Timestamp ไว้เป็นหลักฐาน "Before"
 - [ ] **AC-LAB5-08-02 (Verification of Persistence across Application Restart `C-05` Part A `S6`):**
-  - ทำการสั่ง Restart แอปพลิเคชัน (เช่น การสั่ง Restart Instance บน Cloud Run หรือการสั่ง `docker compose down && docker compose up -d` ในสภาพแวดล้อมที่จำลอง)
-  - เข้าสู่หน้า My Orders อีกครั้ง ยืนยันว่า Order ID เดิมและข้อมูลทั้งหมดยังคงอยู่ครบถ้วน 100%
+  - ดำเนินการทดสอบการ Restart แอปพลิเคชันบน GCP ด้วยวิธีการที่ชัดเจน: รอให้ Container เกิด Idle Scale-to-zero แล้วส่ง Request ปลุก Instance ใหม่ หรือสั่ง Deploy Revision ใหม่โดยไม่มีการเปลี่ยนโค้ด เพื่อให้ Cloud Run สปอน Container instance ใหม่ขึ้นมา
+  - *(ข้อควรระวัง: การทดสอบด้วย `docker compose down && docker compose up -d` ให้ใช้สำหรับ Local testing เท่านั้น ไม่นำมาใช้เป็นหลักฐาน GCP `C-05`)*
+  - เข้าสู่หน้า My Orders บน Live URL อีกครั้ง ยืนยันว่า Order ID เดิมและข้อมูลทั้งหมดยังคงอยู่ครบถ้วน 100%
   - บันทึกภาพหน้าจอเป็นหลักฐาน "After Restart"
-- [ ] **AC-LAB5-08-03 (Manual Rollback Execution via `workflow_dispatch` `R-08`):**
+- [ ] **AC-LAB5-08-03 (Manual Rollback Execution via `workflow_dispatch` - Recommended Practice):**
   - ไปที่ GitHub Actions > Workflow **Deploy demo** > **Run workflow**
   - เลือก Branch: `main`
   - กรอก `image_tag`: **Commit SHA เต็ม 40 ตัวอักษรของ Release A**

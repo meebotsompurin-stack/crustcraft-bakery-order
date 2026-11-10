@@ -43,6 +43,7 @@
   - สคริปต์ `deploy/release.sh` ทำการ Resolve Commit SHA Tag ไปสู่ Fully Qualified `@sha256:...` Image Digest เสมอ (`C-06`)
   - รัน `gcloud run jobs execute crustcraft-migrate --wait` ก่อนการอัปเดต Service หาก Migration ล้มเหลว จะยุติการทำงานทันทีโดยไม่แตะต้อง Service
   - สั่ง `gcloud run services update-traffic crustcraft --to-latest` เพื่อส่ง Traffic 100% ไปยัง Revision ใหม่
+  - สคริปต์ `deploy/release.sh` ต้องทำการเขียนค่า `SERVICE_URL` และ `DEPLOYED_IMAGE` ไปยัง `$GITHUB_ENV` เพื่อให้ขั้นตอนถัดไปใน workflow `deploy.yml` (เช่น Smoke test และ Summary) สามารถดึงค่าไปใช้งานได้โดยตรง
 - [ ] **AC-LAB5-07-04 (Release Identification & Smoke Test Security `M8`):**
   - แสดง Commit SHA เต็ม 40 ตัวอักษร และ Image Digest ใน GitHub Actions Step Summary
   - สามารถตรวจสอบ Commit ของ Revision ที่กำลังรันอยู่ได้ผ่านคำสั่ง `gcloud` และหน้า Console

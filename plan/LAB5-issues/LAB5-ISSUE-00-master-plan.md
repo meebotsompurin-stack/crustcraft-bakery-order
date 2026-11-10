@@ -143,6 +143,7 @@
 2. **Release Promotion to `main`:**
    - เมื่อชุดฟีเจอร์ใน `lab-5-staging` ผ่านการทดสอบเรียบร้อย จะเปิด Release PR จาก `lab-5-staging` เข้าสู่ `main`
    - เฉพาะการ Merge เข้าสู่ `main` เท่านั้นที่จะ Trigger การ Deploy สู่ Google Cloud Run (`R-07`)
+   - **Initial Code Baseline on `main` before `ISSUE-05`:** เมื่อจบ `LAB5-ISSUE-04` จะเปิด Initial Release PR จาก `lab-5-staging` สู่ `main` และ Merge ทันที เพื่อให้โฟลเดอร์ `deploy/` ทั้งหมดและ CI workflow ปรากฏบน `main` ก่อนที่ `ISSUE-05` จะทำการ Checkout `main` บน Cloud Shell ไปสั่งรัน `deploy/deploy.sh`
 3. **Branch Protection & Merge Gate (`protect-main`):**
    - Ruleset `protect-main` มีสถานะ Enforcement = **Active**, Bypass list = **Empty**
    - กำหนดให้ต้องผ่าน Status Check: **`test-and-docker`** (ตรงกับ Job ID ใน `ci-docker.yml`)

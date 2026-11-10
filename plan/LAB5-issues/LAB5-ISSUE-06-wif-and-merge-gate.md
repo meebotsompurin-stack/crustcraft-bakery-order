@@ -29,8 +29,8 @@
 ## 2. Acceptance Criteria
 
 - [ ] **AC-LAB5-06-01 (Deployer SA Least Privilege):**
-  - สร้าง Service Account `crustcraft-deployer` พร้อมมอบหมายบทบาทเฉพาะ:
-    - `roles/run.developer`
+  - สร้าง Service Account `crustcraft-deployer` พร้อมมอบหมายบทบาทเฉพาะระดับ Resource (ไม่มี Project-wide role):
+    - `roles/run.developer` (ผูกเฉพาะเจาะจงบน Cloud Run Service `crustcraft` และ Job `crustcraft-migrate`)
     - `roles/artifactregistry.writer` (เฉพาะบน repo `crustcraft`)
     - `roles/iam.serviceAccountUser` (เฉพาะบน `crustcraft-runner`)
   - ❌ **ห้ามมอบสิทธิ์ `roles/owner`, `roles/editor`, หรือสิทธิ์ Project-wide เด็ดขาด**
@@ -62,6 +62,7 @@
   - Require status checks to pass before merging:
     - Required check: **`test-and-docker`** (ตรงตาม Job ID ใน `ci-docker.yml`)
   - Require branches to be up to date before merging
+  - *(หมายเหตุ: Branch `lab-5-staging` ไม่จำเป็นต้องตั้ง Branch Ruleset ที่เข้มงวดแยกต่างหาก เนื่องจาก Ruleset บน Branch `main` ครอบคลุมข้อกำหนด `R-06` ในการใช้ Required Check บล็อกการ Merge สู่ Production ได้อย่างสมบูรณ์แล้ว)*
 - [ ] **AC-LAB5-06-05 (Proof of Merge Gate `C-02` Execution `M7`, `B2`):**
   - สร้าง Branch ชั่วคราว: `test/prove-gate`
   - แก้ไข Test 1 ตัวใน `server/src/__tests__/` ให้จงใจ Fail (เช่น `expect(1).toBe(2)`)
@@ -92,10 +93,18 @@ gcloud iam service-accounts create crustcraft-deployer \
   --display-name="CrustCraft GitHub Actions Deployer" \
   --project="$PROJECT_ID"
 
-# 4. Grant Roles to Deployer SA
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+# 4. Grant Roles to Deployer SA (Resource-Level Least Privilege)
+gcloud run services add-iam-policy-binding crustcraft \
+  --region=asia-southeast1 \
   --member="serviceAccount:crustcraft-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --role="roles/run.developer"
+  --role="roles/run.developer" \
+  --project="$PROJECT_ID"
+
+gcloud run jobs add-iam-policy-binding crustcraft-migrate \
+  --region=asia-southeast1 \
+  --member="serviceAccount:crustcraft-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/run.developer" \
+  --project="$PROJECT_ID"
 
 gcloud artifacts repositories add-iam-policy-binding crustcraft \
   --location=asia-southeast1 \
