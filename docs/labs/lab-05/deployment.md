@@ -1,6 +1,6 @@
 # CrustCraft Artisan Bakery — Deployment & Cloud Infrastructure Specification
 ## Lab 5: Cloud Deployment and CI/CD Pipeline on Google Cloud Platform (GCP)
-### Document Version: 1.0.0-issue01 (Episode 1 Baseline)
+### Document Version: 1.1.0-issue02 (Episode 2 Cloud-Ready Refactor)
 
 ---
 
@@ -67,10 +67,10 @@ Access control follows the principle of least privilege (PoLP) across human engi
 | **Project Creator (Human)** | Purin Mebotsom (`@meebotsompurin-stack`) | `roles/owner` | Project creation, billing link management, IAM assignment, project lifecycle. |
 | **Co-Developer (Human)** | Saksorn Buranatananun (`@poom2548`) | `roles/editor` (`Editor` under Basic) | Full build, edit, and deployment access. Explicitly restricted from altering project IAM or billing accounts. |
 | **Cloud Run Runtime SA (Automated)** | `crustcraft-runner@cpe334-crustcraft.iam.gserviceaccount.com` | `roles/cloudsql.client`, Secret Manager Secret Accessor (per secret) | Minimal execution identity for Cloud Run web container and migration job. Cannot read unintended secrets, manage IAM, or deploy services. |
-| **GitHub Actions Deployer SA (Automated)** | `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` | `roles/run.developer`, `roles/artifactregistry.writer`, `roles/iam.serviceAccountUser` (on `crustcraft-runner` only) | Dedicated deployment identity assumed via Workload Identity Federation (WIF). Strictly forbidden from holding static JSON keys (`R-02`, Guide Ep. 6). |
+| **GitHub Actions Deployer SA (Automated)** | `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` | `roles/run.developer` (bound to `crustcraft` service and job), `roles/artifactregistry.writer`, `roles/iam.serviceAccountUser` (on `crustcraft-runner` only) | Dedicated deployment identity assumed via Workload Identity Federation (WIF). Strictly forbidden from holding static JSON keys (`R-02`, Guide Ep. 6). |
 
 ### 2.4 Continuous Availability Policy (Handout §3, §12, Master Plan §4.1)
-- **Mandatory Policy:** Cloud Run and Cloud SQL must remain running continuously until course grading concludes and Lab 6 partner User Acceptance Testing (UAT) is complete.
+- **Mandatory Policy:** Keep Cloud Run and Cloud SQL running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing during this period is strictly prohibited.
 - **Teardown Restriction:** Manual deletion or suspension of Cloud SQL or Cloud Run before official instructor clearance is strictly prohibited.
 - **Idle Optimization:** Cloud Run is configured with `--min-instances=0` (scales to zero when idle) and `--max-instances=3` to preserve credits without compromising endpoint responsiveness.
 
@@ -121,32 +121,39 @@ CrustCraft adapts the reference architecture (TokTickIT starter kit) while tailo
 | **Backend Runtime** | Node.js Express (JavaScript/TypeScript) | Node.js Express (TypeScript) | Direct alignment; full type safety and modular router design |
 | **Frontend Framework** | React (Vite) served via Nginx | React (Vite) + Tailwind CSS bundled & served statically via Express in production | Single-container architecture eliminates CORS complexities and optimizes Cloud Run memory footprint |
 | **Database Engine** | PostgreSQL 16 | PostgreSQL 16 (Cloud SQL `db-f1-micro`, Enterprise Edition) | Enterprise edition required by GCP for `db-f1-micro` tier; `--no-storage-auto-increase` prevents runaway disk costs |
-| **Database ORM** | Prisma ORM | Prisma ORM 5.22 | Transitioning from SQLite (`dev.db`) to PostgreSQL schema with integer satang currency |
-| **Containerization** | Multi-stage Dockerfile (Nginx + Node) | Multi-stage Dockerfile (Node.js Alpine building client & server, runtime listening on dynamic `$PORT`) | Fully compliant with Cloud Run container runtime contract |
+| **Database ORM** | Prisma ORM | Prisma ORM 5.22 | Migrated from SQLite to PostgreSQL 16 schema with integer satang currency |
+| **Containerization** | Multi-stage Dockerfile (Nginx + Node) | Multi-stage Dockerfile (Node.js 22 Alpine building client & server, runtime listening on dynamic `$PORT`) | Fully compliant with Cloud Run container runtime contract |
 | **CI/CD & Security** | GitHub Actions + WIF | GitHub Actions (`ci-docker.yml`, `deploy.yml`) + WIF (`github-actions` pool) | Zero long-lived JSON keys; OIDC token exchange gated to `main` branch and `demo` environment |
+
+### 3.2 Cloud-Ready Probes & Single-Container Static Serving (Episode 2)
+
+To satisfy the Cloud Run container runtime contract and enable automated health/readiness monitoring:
+- **Liveness Probe (`GET /api/health`):** Returns HTTP `200 OK` with payload `{"status":"ok"}` indicating the Node.js Express process is responsive.
+- **Readiness Probe (`GET /api/ready`):** Executes an active database connectivity check (`await prisma.$queryRaw`SELECT 1`;`). Returns HTTP `200 OK` with `{"status":"ready","db":"connected"}` when PostgreSQL is reachable, or HTTP `503 Service Unavailable` with error envelope when disconnected.
+- **Single-Container Static Serving (`NODE_ENV=production`):** When running in production, Express directly serves the compiled client Single Page Application (SPA) from `client/dist`. A wildcard route (`*`) forwards non-API requests to `index.html` for client-side React routing, while API requests (`/api/*`) are handled by backend route handlers.
+- **Dynamic Port Binding:** Server dynamically binds to `0.0.0.0:$PORT` defaulting to `Number(process.env.PORT) || 3001` to comply with the Google Cloud Run container contract.
 
 ---
 
-## 4. Environment Variables Specification (Placeholders for Episode 2)
+## 4. Environment Variables Specification (Episode 2 Implementation)
 
-*This section documents every environment variable read by CrustCraft, fulfilling Handout `R-02`. Detailed configuration values will be populated during `LAB5-ISSUE-02`.*
+*This section documents every environment variable read by CrustCraft, fulfilling Handout `R-02`. Zero real secrets are committed into version control.*
 
 | Environment Variable | Classification | Injection Mechanism | Purpose & Expected Value Format |
 |---|---|---|---|
-| `NODE_ENV` | Plain Config | Cloud Run / Docker ENV | Set to `production` in Cloud Run; `development` locally. |
-| `PORT` | Plain Config | Cloud Run Container Contract | Port assigned dynamically by Cloud Run (default: `3000`). |
-| `DATABASE_URL` | **Secret** | Secret Manager (`crustcraft-database-url`) | PostgreSQL connection string (Unix socket on Cloud Run: `postgresql://user:pass@localhost/crustcraft?host=/cloudsql/PROJECT:REGION:INSTANCE`). |
-| `JWT_SECRET` | **Secret** | Secret Manager (`crustcraft-jwt-secret`) | High-entropy secret key for signing and verifying customer/operator auth tokens. |
+| `NODE_ENV` | Plain Config | Cloud Run / Docker ENV / `.env` | Environment mode (`development` locally; `production` on Cloud Run to activate static client serving). |
+| `PORT` | Plain Config | Cloud Run Container Contract / `.env` | Port assigned dynamically by Cloud Run via `$PORT` (defaults to `3001` or `3000`). Server listens on `0.0.0.0:$PORT`. |
+| `DATABASE_URL` | **Secret** | Secret Manager (`crustcraft-database-url`) / `.env` | PostgreSQL 16 connection string (Unix socket on Cloud Run: `postgresql://user:pass@localhost/crustcraft?host=/cloudsql/PROJECT:REGION:INSTANCE`; TCP locally). |
+| `JWT_SECRET` | **Secret** | Secret Manager (`crustcraft-jwt-secret`) / `.env` | High-entropy secret key for signing and verifying customer and operator authentication tokens. |
 | `ADMIN_PASSWORD` | **Secret** | Secret Manager (`crustcraft-admin-password`) | Initial password for the seeded Operator/Admin account (`admin@crustcraft.com`). |
 | `SEED_DEMO_DATA` | Plain Config | Cloud Run ENV | Boolean (`true`/`false`) toggling seed execution in migration job. |
 | `DEMO_USER_PASSWORD` | **Secret** | Secret Manager (`crustcraft-demo-password`) | Shared baseline password for customer demo accounts (shared privately for Lab 6 UAT). |
-| `CORS_ORIGIN` | Plain Config | Cloud Run ENV | Allowed CORS origins for external API access (optional in single-container mode). |
+| `CLIENT_ORIGIN` | Plain Config | Cloud Run ENV / `.env` | Allowed CORS origin for local development (`http://localhost:5173`). Optional in single-container production. |
+| `VITE_API_URL` | Plain Config | Client `.env` / Build ARG | API base URL for client Vite build (`http://localhost:3001` in local dev; empty string in production). |
 
 ---
 
-## 5. Local & CI Build, Test, and Containerization Commands (Placeholders for Episodes 3 & 4)
-
-*Detailed execution commands and Docker Compose definitions will be populated during `LAB5-ISSUE-03` and `LAB5-ISSUE-04`.*
+## 5. Local & CI Build, Test, and Containerization Commands
 
 ### 5.1 Local Development & Container Validation (`C-03`)
 ```bash
@@ -155,14 +162,27 @@ git clone https://github.com/meebotsompurin-stack/crustcraft-bakery-order.git
 cd crustcraft-bakery-order
 cp .env.example .env
 
-# Containerized execution
+# Local development without Docker
+npm ci
+npm run dev
+
+# Containerized execution via Docker Compose
 docker compose up --build -d
 docker compose ps -a
 curl -f http://localhost:3000/api/health
 curl -f http://localhost:3000/api/ready
 ```
 
-### 5.2 CI Workflow Commands (`ci-docker.yml`)
+### 5.2 Database Migration & Seeding Commands
+```bash
+# Apply pending Prisma migrations
+npx prisma migrate deploy --schema=prisma/schema.prisma
+
+# Execute idempotent database seed
+npx tsx prisma/seed.ts
+```
+
+### 5.3 CI Workflow Commands (`ci-docker.yml`)
 ```bash
 # Workspace unit & integration tests
 npm ci
@@ -173,23 +193,32 @@ docker build -t crustcraft:local .
 
 ---
 
-## 6. Repeatable Release & Rollback Procedure (Placeholders for Episodes 5, 7, 8)
-
-*The step-by-step repeatable release, commit identification (`R-08`), and zero-downtime rollback protocols will be finalized in `LAB5-ISSUE-07` and `LAB5-ISSUE-08`.*
+## 6. Repeatable Release & Rollback Procedure
 
 ### 6.1 Release Flow (`R-07`, `C-06`)
 1. Developer opens PR from feature branch into `lab-5-staging`.
-2. Automated check `test-and-docker` runs and must pass.
+2. Automated check `test-and-docker` runs on GitHub Actions and must pass.
 3. Teammate conducts peer review with specific findings and approves (`R-09`).
 4. PR is merged to `lab-5-staging`.
 5. Release PR opened from `lab-5-staging` into `main`.
 6. Merge to `main` triggers `.github/workflows/deploy.yml` via WIF.
 7. Image built, pushed to Artifact Registry tagged with `${{ github.sha }}`, migration job executed, Cloud Run updated to image digest, smoke test validates `/api/ready`.
 
-### 6.2 Rollback Flow (`R-08`, Guide Ep. 8)
+### 6.2 Rollback Flow (`R-08`, Recommended Practice Handout §5)
 1. Navigate to GitHub Actions > **Deploy demo** workflow.
 2. Click **Run workflow**, select branch `main`, and supply the target 40-character commit SHA in `image_tag`.
 3. Pipeline skips build/migration and deploys the pre-existing validated image digest to Cloud Run with zero database disruption.
+
+### 6.3 Running Commit Lookup Procedure (`R-08`)
+To determine and verify the exact commit SHA currently serving live traffic on Cloud Run:
+1. **GitHub Actions Summary:** Review the latest executed `Deploy demo` workflow run summary; it outputs the 40-character Commit SHA (`$IMAGE_TAG`) and immutable image digest (`$DEPLOYED_IMAGE`).
+2. **Cloud Run Console:** In GCP Console > Cloud Run > Service `crustcraft` > Revisions tab, inspect the active revision's container image URL.
+3. **gcloud CLI Verification Command:**
+   ```bash
+   gcloud run services describe crustcraft \
+     --region=asia-southeast1 \
+     --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
+   ```
 
 ---
 

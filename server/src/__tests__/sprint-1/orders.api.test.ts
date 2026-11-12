@@ -3,7 +3,9 @@ import request from 'supertest';
 import { execSync } from 'child_process';
 import path from 'path';
 
-process.env.DATABASE_URL = 'file:./test.db';
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://crustcraft:crustcraft_test_password@localhost:5432/crustcraft_test?schema=public';
+}
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'crustcraft-api-test-jwt-secret-2026';
 }
@@ -37,10 +39,14 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
 
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
-    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-      env: { ...process.env, DATABASE_URL: 'file:./test.db' },
-      stdio: 'pipe',
-    });
+    try {
+      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+        env: { ...process.env },
+        stdio: 'pipe',
+      });
+    } catch (error) {
+      console.warn('Prisma migrate deploy note in orders test:', error instanceof Error ? error.message : error);
+    }
 
     // Create 2 test customers for ownership isolation verification (BR-04)
     customer1 = await prisma.user.create({
@@ -75,9 +81,16 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
     operatorToken = signToken({ userId: operatorUser.id, role: 'OPERATOR' });
 
     // Clean up any conflicting test bakery items
-    await prisma.bakeryItem.deleteMany({
-      where: { id: { in: ownedItemIds } },
-    });
+    try {
+      await prisma.orderItem.deleteMany({
+        where: { bakeryItemId: { in: ownedItemIds } },
+      });
+      await prisma.bakeryItem.deleteMany({
+        where: { id: { in: ownedItemIds } },
+      });
+    } catch {
+      // Ignore if items do not exist
+    }
 
     // 1. In-stock item A: Butter Croissant (price: 8500 satang, stock: 10)
     await prisma.bakeryItem.create({
@@ -133,32 +146,42 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
   });
 
   afterAll(async () => {
-    // Delete order items and orders created for this test run
-    await prisma.orderItem.deleteMany({
-      where: {
-        order: {
-          customerId: { in: [customer1?.id, customer2?.id].filter(Boolean) },
+    try {
+      const userIds = [customer1?.id, customer2?.id, operatorUser?.id].filter(Boolean);
+      // Delete order items and orders created for this test run
+      await prisma.orderItem.deleteMany({
+        where: {
+          order: {
+            customerId: { in: userIds },
+          },
         },
-      },
-    });
-
-    await prisma.order.deleteMany({
-      where: {
-        customerId: { in: [customer1?.id, customer2?.id].filter(Boolean) },
-      },
-    });
-
-    // Clean up test bakery items
-    await prisma.bakeryItem.deleteMany({
-      where: { id: { in: ownedItemIds } },
-    });
-
-    // Clean up test users
-    const userIds = [customer1?.id, customer2?.id, operatorUser?.id].filter(Boolean);
-    if (userIds.length > 0) {
-      await prisma.user.deleteMany({
-        where: { id: { in: userIds } },
       });
+
+      await prisma.order.deleteMany({
+        where: {
+          customerId: { in: userIds },
+        },
+      });
+
+      // Clean up test bakery items
+      await prisma.orderItem.deleteMany({
+        where: { bakeryItemId: { in: ownedItemIds } },
+      });
+
+      await prisma.bakeryItem.deleteMany({
+        where: { id: { in: ownedItemIds } },
+      });
+
+      // Clean up test users
+      if (userIds.length > 0) {
+        await prisma.user.deleteMany({
+          where: { id: { in: userIds } },
+        });
+      }
+    } catch (e) {
+      // Ignore teardown cleanup errors
+    } finally {
+      await prisma.$disconnect();
     }
   });
 

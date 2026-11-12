@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import { execSync } from 'child_process';
 import path from 'path';
 
-process.env.DATABASE_URL = 'file:./test.db';
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://crustcraft:crustcraft_test_password@localhost:5432/crustcraft_test?schema=public';
+}
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'crustcraft-api-test-jwt-secret-2026';
 }
@@ -29,10 +31,14 @@ describe('F-04 Operator Order Queue & Acceptance API Tests (OPS-01 to OPS-08)', 
 
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
-    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-      env: { ...process.env, DATABASE_URL: 'file:./test.db' },
-      stdio: 'pipe',
-    });
+    try {
+      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+        env: { ...process.env },
+        stdio: 'pipe',
+      });
+    } catch (error) {
+      console.warn('Prisma migrate deploy note in operator test:', error instanceof Error ? error.message : error);
+    }
 
     const pwdHash = await hashPassword('password123');
 
@@ -127,28 +133,41 @@ describe('F-04 Operator Order Queue & Acceptance API Tests (OPS-01 to OPS-08)', 
   });
 
   afterAll(async () => {
-    // Clean up test data
-    await prisma.orderItem.deleteMany({
-      where: {
-        orderId: { in: [pendingOrderId, acceptedOrderId] },
-      },
-    });
-    await prisma.order.deleteMany({
-      where: {
-        id: { in: [pendingOrderId, acceptedOrderId] },
-      },
-    });
-    if (testBakeryItemId) {
-      await prisma.bakeryItem.deleteMany({
-        where: { id: testBakeryItemId },
+    try {
+      // Clean up test order items and orders
+      const orderIds = [pendingOrderId, acceptedOrderId].filter(Boolean);
+      if (orderIds.length > 0) {
+        await prisma.orderItem.deleteMany({
+          where: {
+            orderId: { in: orderIds },
+          },
+        });
+        await prisma.order.deleteMany({
+          where: {
+            id: { in: orderIds },
+          },
+        });
+      }
+
+      if (testBakeryItemId) {
+        await prisma.orderItem.deleteMany({
+          where: { bakeryItemId: testBakeryItemId },
+        });
+        await prisma.bakeryItem.deleteMany({
+          where: { id: testBakeryItemId },
+        });
+      }
+
+      await prisma.user.deleteMany({
+        where: {
+          email: { in: [operatorEmail, customerEmail] },
+        },
       });
+    } catch (e) {
+      // Ignore teardown cleanup errors
+    } finally {
+      await prisma.$disconnect();
     }
-    await prisma.user.deleteMany({
-      where: {
-        email: { in: [operatorEmail, customerEmail] },
-      },
-    });
-    await prisma.$disconnect();
   });
 
   // OPS-01

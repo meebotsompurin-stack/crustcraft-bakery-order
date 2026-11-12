@@ -4,7 +4,9 @@ import jwt from 'jsonwebtoken';
 import { execSync } from 'child_process';
 import path from 'path';
 
-process.env.DATABASE_URL = 'file:./test.db';
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://crustcraft:crustcraft_test_password@localhost:5432/crustcraft_test?schema=public';
+}
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'crustcraft-api-test-jwt-secret-2026';
 }
@@ -26,18 +28,35 @@ describe('F-01 Authentication & RBAC API Integration Tests (AUTH-01 to AUTH-07, 
 
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
-    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-      env: { ...process.env, DATABASE_URL: 'file:./test.db' },
-      stdio: 'pipe',
-    });
+    try {
+      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+        env: { ...process.env },
+        stdio: 'pipe',
+      });
+    } catch (error) {
+      console.warn('Prisma migrate deploy note in auth test:', error instanceof Error ? error.message : error);
+    }
 
-    await prisma.user.deleteMany({
-      where: {
-        email: {
-          in: ownedTestEmails,
-        },
-      },
-    });
+    try {
+      const staleUsers = await prisma.user.findMany({
+        where: { email: { in: ownedTestEmails } },
+        select: { id: true },
+      });
+      const staleUserIds = staleUsers.map((u) => u.id);
+      if (staleUserIds.length > 0) {
+        await prisma.orderItem.deleteMany({
+          where: { order: { customerId: { in: staleUserIds } } },
+        });
+        await prisma.order.deleteMany({
+          where: { customerId: { in: staleUserIds } },
+        });
+        await prisma.user.deleteMany({
+          where: { id: { in: staleUserIds } },
+        });
+      }
+    } catch {
+      // Ignore cleanup error before creating test users
+    }
 
     const operatorHash = await hashPassword('operator123');
     await prisma.user.upsert({
@@ -53,14 +72,28 @@ describe('F-01 Authentication & RBAC API Integration Tests (AUTH-01 to AUTH-07, 
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({
-      where: {
-        email: {
-          in: ownedTestEmails,
-        },
-      },
-    });
-    await prisma.$disconnect();
+    try {
+      const users = await prisma.user.findMany({
+        where: { email: { in: ownedTestEmails } },
+        select: { id: true },
+      });
+      const userIds = users.map((u) => u.id);
+      if (userIds.length > 0) {
+        await prisma.orderItem.deleteMany({
+          where: { order: { customerId: { in: userIds } } },
+        });
+        await prisma.order.deleteMany({
+          where: { customerId: { in: userIds } },
+        });
+        await prisma.user.deleteMany({
+          where: { id: { in: userIds } },
+        });
+      }
+    } catch (e) {
+      // Ignore cleanup errors during teardown
+    } finally {
+      await prisma.$disconnect();
+    }
   });
 
   it('AUTH-01: POST /api/auth/register creates User with CUSTOMER role and returns 201 with user data (excluding passwordHash)', async () => {

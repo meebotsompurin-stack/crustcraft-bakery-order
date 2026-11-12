@@ -14,7 +14,7 @@
     "build": "npm run build --workspace=server && npm run build --workspace=client",
     "test": "npm run test --workspace=server",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
-    "db:migrate": "node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'file:./dev.db';require('child_process').execSync('npx prisma migrate dev --name init --schema=prisma/schema.prisma',{stdio:'inherit'})\"",
+    "db:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
     "seed": "npm run seed --workspace=server"
   },
   "prisma": {
