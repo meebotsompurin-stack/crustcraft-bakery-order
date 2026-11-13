@@ -3,8 +3,9 @@ import { getJwtSecret } from './services/auth.service';
 
 getJwtSecret();
 
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = '0.0.0.0';
 
-app.listen(PORT, () => {
-  console.log(`CrustCraft API server listening on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`CrustCraft API server listening on http://${HOST}:${PORT}`);
 });

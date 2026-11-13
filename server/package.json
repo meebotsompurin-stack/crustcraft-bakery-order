@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'file:./dev.db';process.env.JWT_SECRET=process.env.JWT_SECRET||'crustcraft-dev-jwt-secret-2026';require('child_process').execSync('npx tsx watch src/server.ts',{stdio:'inherit'})\"",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'file:./test.db';process.env.JWT_SECRET=process.env.JWT_SECRET||'crustcraft-test-jwt-secret-2026';require('child_process').execSync('npx vitest run',{stdio:'inherit'})\"",
+    "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'file:./dev.db';require('child_process').execSync('npx prisma migrate dev --name init --schema=../prisma/schema.prisma',{stdio:'inherit'})\"",
-    "seed": "node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'file:./dev.db';require('child_process').execSync('npx tsx ../prisma/seed.ts',{stdio:'inherit'})\""
+    "db:migrate": "prisma migrate dev --schema=../prisma/schema.prisma",
+    "seed": "tsx ../prisma/seed.ts"
   },
   "prisma": {
     "schema": "../prisma/schema.prisma",

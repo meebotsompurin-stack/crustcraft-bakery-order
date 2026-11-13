@@ -4,53 +4,63 @@ import { prisma } from '../server/src/lib/db';
 const SALT_ROUNDS = 10;
 
 export async function seedDatabase() {
-  const operatorPasswordHash = await bcrypt.hash('operator123', SALT_ROUNDS);
-  const customerPasswordHash = await bcrypt.hash('customer123', SALT_ROUNDS);
+  if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+    throw new Error('Missing ADMIN_PASSWORD');
+  }
+
+  const adminPassword = process.env.ADMIN_PASSWORD || 'supersecret_admin_pass';
+  const demoUserPassword = process.env.DEMO_USER_PASSWORD || 'supersecret_demo_pass';
+
+  const operatorPasswordHash = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+  const customerPasswordHash = await bcrypt.hash(demoUserPassword, SALT_ROUNDS);
 
   await prisma.user.upsert({
-    where: { email: 'operator@crustcraft.com' },
+    where: { email: 'admin@crustcraft.com' },
     update: {
-      name: 'Head Baker Operator',
+      name: 'Head Baker Admin',
       passwordHash: operatorPasswordHash,
       role: 'OPERATOR',
     },
     create: {
-      name: 'Head Baker Operator',
-      email: 'operator@crustcraft.com',
+      name: 'Head Baker Admin',
+      email: 'admin@crustcraft.com',
       passwordHash: operatorPasswordHash,
       role: 'OPERATOR',
     },
   });
 
-  await prisma.user.upsert({
-    where: { email: 'customer1@test.com' },
-    update: {
-      name: 'Customer One',
-      passwordHash: customerPasswordHash,
-      role: 'CUSTOMER',
-    },
-    create: {
-      name: 'Customer One',
-      email: 'customer1@test.com',
-      passwordHash: customerPasswordHash,
-      role: 'CUSTOMER',
-    },
-  });
+  const shouldSeedDemo = process.env.SEED_DEMO_DATA !== 'false';
+  if (shouldSeedDemo) {
+    await prisma.user.upsert({
+      where: { email: 'customer1@test.com' },
+      update: {
+        name: 'Customer One',
+        passwordHash: customerPasswordHash,
+        role: 'CUSTOMER',
+      },
+      create: {
+        name: 'Customer One',
+        email: 'customer1@test.com',
+        passwordHash: customerPasswordHash,
+        role: 'CUSTOMER',
+      },
+    });
 
-  await prisma.user.upsert({
-    where: { email: 'customer2@test.com' },
-    update: {
-      name: 'Customer Two',
-      passwordHash: customerPasswordHash,
-      role: 'CUSTOMER',
-    },
-    create: {
-      name: 'Customer Two',
-      email: 'customer2@test.com',
-      passwordHash: customerPasswordHash,
-      role: 'CUSTOMER',
-    },
-  });
+    await prisma.user.upsert({
+      where: { email: 'customer2@test.com' },
+      update: {
+        name: 'Customer Two',
+        passwordHash: customerPasswordHash,
+        role: 'CUSTOMER',
+      },
+      create: {
+        name: 'Customer Two',
+        email: 'customer2@test.com',
+        passwordHash: customerPasswordHash,
+        role: 'CUSTOMER',
+      },
+    });
+  }
 
   const bakeryItems = [
     {
@@ -111,11 +121,8 @@ export async function seedDatabase() {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = 'file:./dev.db';
-  }
   await seedDatabase();
-  console.log('Seed completed successfully (3 Users, 5 BakeryItems in integer satang).');
+  console.log('Seed completed successfully (Admin & Demo Users, 5 BakeryItems in integer satang).');
 }
 
 main()
