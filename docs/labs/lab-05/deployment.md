@@ -1,6 +1,6 @@
 # CrustCraft Artisan Bakery — Deployment & Cloud Infrastructure Specification
 ## Lab 5: Cloud Deployment and CI/CD Pipeline on Google Cloud Platform (GCP)
-### Document Version: 1.1.0-issue03 (Episode 3 Docker Compose)
+### Document Version: 1.3.0-issue04 (Episode 4 CI & Offline Deploy Verification)
 
 ---
 
@@ -196,13 +196,32 @@ npx tsx prisma/seed.ts
 ```
 
 ### 5.3 CI Workflow Commands (`ci-docker.yml`)
-```bash
-# Workspace unit & integration tests
-npm ci
-npm run build
-npm test
-docker build -t crustcraft:local .
-```
+- **Triggers:** `workflow_call`, `pull_request` targeting `[main, lab-5-staging]`, and `workflow_dispatch`.
+- **Required Check Job ID:** `test-and-docker` (runs on `ubuntu-latest` with `contents: read` permissions).
+- **Service Container:** `postgres:16-alpine` with `pg_isready` healthcheck and ephemeral CI test credentials (`crustcraft` / `crustcraft_test_password` / `crustcraft_test`).
+- **Supply-Chain Security:** All third-party actions (`actions/checkout`, `actions/setup-node` on Node 22, `actions/setup-python` on Python 3.12) are pinned to full 40-character commit SHAs, with weekly `.github/dependabot.yml` updates for `npm` and `github-actions`.
+- **Offline Deployment Script Checks:**
+  ```bash
+  bash -n deploy/deploy.sh deploy/teardown.sh deploy/release.sh
+  bash deploy/tests/test_deploy_stub.sh
+  bash deploy/tests/test_release_stub.sh
+  python3 -m unittest discover -s deploy/tests -p 'test_smoke.py'
+  ```
+- **Application Build & Test:**
+  ```bash
+  # Backend tests against ephemeral CI Postgres
+  npm ci
+  npx prisma generate
+  npx prisma migrate deploy
+  npm run seed
+  npm test
+
+  # Frontend Vite build
+  cd client && npm ci && npm run build
+
+  # Unified production Docker build
+  docker build -t crustcraft-app:latest .
+  ```
 
 ---
 

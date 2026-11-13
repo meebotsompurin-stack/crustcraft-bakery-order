@@ -14,3 +14,7 @@ server/uploads
 *.db-shm
 *.sqlite
 gha-creds-*.json
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
