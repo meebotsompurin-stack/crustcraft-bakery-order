@@ -1,6 +1,6 @@
 # CrustCraft Artisan Bakery — Deployment & Cloud Infrastructure Specification
 ## Lab 5: Cloud Deployment and CI/CD Pipeline on Google Cloud Platform (GCP)
-### Document Version: 1.4.0-issue05 (Episode 5 First GCP Deployment via Cloud Shell)
+### Document Version: 1.5.0-issue06 (Episode 6 WIF & Merge Gate)
 
 ---
 
@@ -302,6 +302,11 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`C-04` (`R-03`)** | GCP Deployment | Live Cloud Run Public URL | Revision `crustcraft-00001-7kz` | `https://crustcraft-d7wyiqxska-as.a.run.app`; Auth, pre-order, catalog, operator queue verified live |
 | **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test | `cpe334-bobcat:crustcraft-pg` | Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL; stock updated 50->47 |
 | **`C-06` (`R-07`–`R-10`)| Repeatable Release | Staging -> Main PR & Revision History | Full SHA `TBD` | Revision digest matches Artifact Registry commit tag |
+| **`AC-LAB5-06-01` / `R-02`, `R-03`** | Security / WIF IAM | GCP IAM Console (`crustcraft-deployer`) | `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` | `TBD` — Resource-level roles only (`run.developer`, `artifactregistry.writer`, `serviceAccountUser`); Keys tab empty |
+| **`AC-LAB5-06-02` / `M6`, `R-03`** | Keyless WIF Auth | GCP WIF Console (`github-actions` / `github-main`) | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/providers/github-main` | `TBD` — OIDC provider + CEL condition + `workloadIdentityUser` binding verified |
+| **`AC-LAB5-06-03` / `R-02`** | GitHub Environment | GitHub Settings > Environments > `demo` | `demo` (`main` branch only) | `TBD` — 4 plain variables (`GCP_PROJECT_ID`, `GCP_REGION`, `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`) configured |
+| **`AC-LAB5-06-04` / `M7`, `R-06`, `R-09`, `R-12`** | Merge Gate Governance | GitHub Settings > Rulesets > `protect-main` | Target: `main` (Active, No bypass) | `TBD` — 1 approval (no self-approval), required check `test-and-docker`, up-to-date branch, no force-push/deletion |
+| **`AC-LAB5-06-05` / `C-02` (`R-06`)** | Merge Gate Proof | Temporary PR from `test/prove-gate` -> `main` | PR #`TBD`, Commit `TBD` | `TBD` — `test-and-docker` failed (red); merge blocked; screenshot captured before closing PR & deleting branch |
 
 ---
 
@@ -375,3 +380,174 @@ Real end-to-end business workflows were verified live on the production Cloud Ru
 > - **No Pausing Permitted:** Pausing or suspending Cloud SQL during the grading and UAT window is strictly prohibited.
 > - **No Early Teardown:** The teardown script (`deploy/teardown.sh`) permanently deletes Cloud SQL, the database, and all test orders. Running teardown before course grading concludes is strictly forbidden.
 > - **Fiscal Efficiency Safeguard:** Cloud Run automatically scales to zero instances when idle (`--min-instances=0`), keeping ongoing costs minimal while maintaining continuous readiness for grading and peer testing.
+
+---
+
+## 9. Workload Identity Federation (WIF) & GitHub Merge Gate (Episode 6)
+
+*This section specifies the keyless OIDC authentication architecture between GitHub Actions and Google Cloud Platform (`R-03`, `M6`), along with the `protect-main` branch protection ruleset and `C-02` (`R-06`, `M7`) merge-gate verification procedure. All cloud, GitHub settings, and `C-02` execution steps are performed by human operators after reviewing every command.*
+
+### 9.1 Deployer Service Account & Least Privilege (`AC-LAB5-06-01`)
+
+- **Required APIs:** Enable `iamcredentials.googleapis.com` and `sts.googleapis.com` on the target GCP project.
+- **Deployer Service Account:** `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com`
+- **Resource-Level Roles Only:**
+  - `roles/run.developer` on Cloud Run service `crustcraft` and Cloud Run job `crustcraft-migrate` (region `asia-southeast1`).
+  - `roles/artifactregistry.writer` on Artifact Registry repository `crustcraft` (`asia-southeast1`).
+  - `roles/iam.serviceAccountUser` on `crustcraft-runner@cpe334-crustcraft.iam.gserviceaccount.com` only.
+- **Explicit Restrictions:**
+  - **No `roles/owner`, `roles/editor`, or project-wide roles** may be granted to `crustcraft-deployer`.
+  - **Zero JSON Keys:** Authentication is keyless WIF OIDC only. The Service Account **Keys** tab must remain empty, and nobody may click **"Add key"** or download/export a JSON key file (`R-02`, Lab Sheet §4.3).
+
+### 9.2 Workload Identity Pool, OIDC Provider & CEL Condition (`AC-LAB5-06-02`, `M6`)
+
+1. **Obtain Team-Specific GitHub Numeric IDs (Read-Only):**
+   Run the following read-only commands (or inspect `https://api.github.com/repos/meebotsompurin-stack/crustcraft-bakery-order`) to retrieve the team's own numeric repository and owner IDs. **Never copy another team's IDs.**
+   ```bash
+   gh api repos/meebotsompurin-stack/crustcraft-bakery-order --jq '.id, .owner.id'
+   gh api repos/meebotsompurin-stack/crustcraft-bakery-order/actions/oidc/customization/sub
+   ```
+   > [!NOTE]
+   > Check `use_immutable_subject` from the second command. If `use_immutable_subject` is enabled on the repository, the `assertion.sub` claim format differs from `repo:<owner>/<repo>:environment:demo`, so verify the exact `sub` format before creating the OIDC provider.
+
+2. **Pool & OIDC Provider Specification:**
+   - **Workload Identity Pool:** `github-actions` (location: `global`)
+   - **OIDC Provider:** `github-main`
+   - **Issuer URI:** `https://token.actions.githubusercontent.com`
+   - **Attribute Mapping:**
+     ```text
+     google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.repository_owner_id=assertion.repository_owner_id,attribute.ref=assertion.ref,attribute.environment=assertion.environment
+     ```
+   - **Exact CEL Attribute Condition (`M6`):**
+     ```cel
+     assertion.repository_id == '<YOUR_NUMERIC_REPO_ID>' &&
+     assertion.repository_owner_id == '<YOUR_NUMERIC_OWNER_ID>' &&
+     assertion.ref == 'refs/heads/main' &&
+     assertion.workflow_ref.startsWith('meebotsompurin-stack/crustcraft-bakery-order/.github/workflows/deploy.yml@refs/heads/main') &&
+     assertion.sub == 'repo:meebotsompurin-stack/crustcraft-bakery-order:environment:demo'
+     ```
+   - **Workload Identity User Binding:** Bind `roles/iam.workloadIdentityUser` on `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` to:
+     ```text
+     principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/attribute.repository_id/<YOUR_NUMERIC_REPO_ID>
+     ```
+
+3. **Human-Run Cloud Shell Command Block (Placeholder Template):**
+   *Review every line before running in Cloud Shell. Never commit real `<PROJECT_NUMBER>`, `<YOUR_NUMERIC_REPO_ID>`, or `<YOUR_NUMERIC_OWNER_ID>` values into documentation.*
+   ```bash
+   PROJECT_ID="cpe334-crustcraft"
+   PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+   REPO="meebotsompurin-stack/crustcraft-bakery-order"
+
+   # 1. Obtain GitHub Repo ID and Owner ID via GitHub API
+   # Replace with actual numeric IDs obtained from https://api.github.com/repos/meebotsompurin-stack/crustcraft-bakery-order
+   REPO_ID="<YOUR_NUMERIC_REPO_ID>"
+   OWNER_ID="<YOUR_NUMERIC_OWNER_ID>"
+
+   # 2. Enable Required Security APIs
+   gcloud services enable iamcredentials.googleapis.com sts.googleapis.com --project="$PROJECT_ID"
+
+   # 3. Create Deployer Service Account
+   gcloud iam service-accounts create crustcraft-deployer \
+     --display-name="CrustCraft GitHub Actions Deployer" \
+     --project="$PROJECT_ID"
+
+   # 4. Grant Roles to Deployer SA (Resource-Level Least Privilege)
+   gcloud run services add-iam-policy-binding crustcraft \
+     --region=asia-southeast1 \
+     --member="serviceAccount:crustcraft-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --role="roles/run.developer" \
+     --project="$PROJECT_ID"
+
+   gcloud run jobs add-iam-policy-binding crustcraft-migrate \
+     --region=asia-southeast1 \
+     --member="serviceAccount:crustcraft-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --role="roles/run.developer" \
+     --project="$PROJECT_ID"
+
+   gcloud artifacts repositories add-iam-policy-binding crustcraft \
+     --location=asia-southeast1 \
+     --member="serviceAccount:crustcraft-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --role="roles/artifactregistry.writer" \
+     --project="$PROJECT_ID"
+
+   gcloud iam service-accounts add-iam-policy-binding "crustcraft-runner@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --member="serviceAccount:crustcraft-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --role="roles/iam.serviceAccountUser" \
+     --project="$PROJECT_ID"
+
+   # 5. Create Workload Identity Pool
+   gcloud iam workload-identity-pools create github-actions \
+     --location="global" \
+     --display-name="GitHub Actions Pool" \
+     --project="$PROJECT_ID"
+
+   # 6. Create Workload Identity Provider with CEL Attribute Condition (M6)
+   gcloud iam workload-identity-pools providers create-oidc github-main \
+     --location="global" \
+     --workload-identity-pool="github-actions" \
+     --display-name="GitHub Actions Main Provider" \
+     --issuer-uri="https://token.actions.githubusercontent.com" \
+     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.repository_id=assertion.repository_id,attribute.repository_owner_id=assertion.repository_owner_id,attribute.ref=assertion.ref,attribute.environment=assertion.environment" \
+     --attribute-condition="assertion.repository_id == '${REPO_ID}' && assertion.repository_owner_id == '${OWNER_ID}' && assertion.ref == 'refs/heads/main' && assertion.workflow_ref.startsWith('${REPO}/.github/workflows/deploy.yml@refs/heads/main') && assertion.sub == 'repo:${REPO}:environment:demo'" \
+     --project="$PROJECT_ID"
+
+   # 7. Bind Deployer SA Impersonation with attribute.repository_id
+   gcloud iam service-accounts add-iam-policy-binding "crustcraft-deployer@${PROJECT_ID}.iam.gserviceaccount.com" \
+     --role="roles/iam.workloadIdentityUser" \
+     --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-actions/attribute.repository_id/${REPO_ID}" \
+     --project="$PROJECT_ID"
+   ```
+
+### 9.3 GitHub Environment `demo` (`AC-LAB5-06-03`)
+
+- **3-Way Name Consistency:** The environment name `demo` must match identically across three places:
+  1. The GitHub Repository Environment (`Settings > Environments > demo`).
+  2. `environment: demo` in `.github/workflows/deploy.yml` (implemented in Issue 7).
+  3. `:environment:demo` in the WIF OIDC provider CEL condition (`assertion.sub`).
+- **Deployment Branches:** Selected branches only — `main`.
+- **Environment Variables (4 Plain Variables, NOT Secrets):**
+
+| Variable Name | Configured Value |
+|---|---|
+| `GCP_PROJECT_ID` | `cpe334-crustcraft` |
+| `GCP_REGION` | `asia-southeast1` |
+| `WIF_PROVIDER` | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/providers/github-main` |
+| `WIF_SERVICE_ACCOUNT` | `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` |
+
+> [!WARNING]
+> Do **not** commit the real numeric `<PROJECT_NUMBER>` into this document or any repository file. Replace `<PROJECT_NUMBER>` only inside the GitHub Environment variable UI and Cloud Shell commands.
+
+### 9.4 Branch Protection Ruleset `protect-main` (`AC-LAB5-06-04`, `M7`)
+
+- **Repository Visibility (`R-12`):** The repository must remain **public** so GitHub Free supports branch protection rulesets.
+- **Ruleset Configuration (`Settings > Rules > Rulesets > protect-main`):**
+  - **Enforcement status:** `Active`
+  - **Bypass list:** Empty (no bypass actors)
+  - **Target branches:** `main`
+  - **Require a pull request before merging:** `1` approval, with **Do not allow author approval** enabled to prevent self-approval (`R-09`).
+  - **Require status checks to pass before merging:** Required check `test-and-docker` (matching the job ID in `.github/workflows/ci-docker.yml`), with **Require branches to be up to date before merging** enabled.
+  - **Branch Integrity Protections:** **Restrict deletions** and **Block force pushes** enabled.
+- **Staging Branch Note:** `lab-5-staging` does not require a separate strict ruleset because `protect-main` enforces `R-06` on all releases entering production (`main`).
+
+### 9.5 Merge Gate Proof Procedure `C-02` (`AC-LAB5-06-05`, Human-Executed)
+
+1. Confirm that ruleset `protect-main` is **Active** and `.github/workflows/ci-docker.yml` is present on `main`.
+2. Create a temporary branch `test/prove-gate` from `main`.
+3. Modify one test in `server/src/__tests__/` to fail intentionally (for example, `expect(1).toBe(2)`).
+4. Push `test/prove-gate` and open a Pull Request with base `main`, labeled `lab5`.
+5. Wait for the `test-and-docker` GitHub Actions check to fail (red).
+6. Capture a screenshot clearly showing the PR link, the failed `test-and-docker` check, and the blocked/disabled Merge button. Use the lab sheet caption format, for example:
+   *"Figure N. C-02 (R-06): PR #X from temporary branch test/prove-gate; the required check test-and-docker failed and merging is blocked. Commit <sha>."*
+7. **Only after the screenshot is captured and saved:** close the Pull Request without merging and delete the `test/prove-gate` branch.
+
+### 9.6 Episode 6 Evidence Screenshots & Redaction Reminders
+
+Collect the following 5 screenshots for the final report (Handout Part 1):
+1. **Screenshot 1:** GCP IAM Console showing `crustcraft-deployer` with resource-level least-privilege roles only (and empty Keys tab).
+2. **Screenshot 2:** GCP WIF Console showing Pool `github-actions`, Provider `github-main`, and the CEL attribute condition.
+3. **Screenshot 3:** GitHub `Settings > Environments > demo` showing all 4 plain variables (`GCP_PROJECT_ID`, `GCP_REGION`, `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`).
+4. **Screenshot 4:** GitHub `Settings > Rulesets > protect-main` showing `Active` status, required check `test-and-docker`, 1 approval (no self-approval), and empty bypass list.
+5. **Screenshot 5 (`C-02`):** Pull Request on `test/prove-gate` -> `main` showing the red failed `test-and-docker` check and the blocked Merge button.
+
+> [!CAUTION]
+> **Redaction Reminder:** Before submitting screenshots in the report, redact/mask the numeric `<PROJECT_NUMBER>` (if visible) and any secret values, tokens, or connection strings.
