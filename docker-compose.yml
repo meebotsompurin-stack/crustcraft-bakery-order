@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: crustcraft-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crustcraft_test
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d crustcraft_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crustcraft-migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/crustcraft_test?schema=public"
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-supersecret_admin_pass}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-supersecret_demo_pass}
+      SEED_DEMO_DATA: "true"
+    command: sh -c "npx prisma migrate deploy && npm run seed"
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crustcraft-app
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@db:5432/crustcraft_test?schema=public"
+      PORT: 3000
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET:-crustcraft-dev-jwt-secret-replace-in-production-2026}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-supersecret_admin_pass}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-supersecret_demo_pass}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:
