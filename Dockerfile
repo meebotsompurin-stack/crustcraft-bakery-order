@@ -1,11 +1,13 @@
 # Stage 1: Build Frontend
 FROM node:22-alpine AS client-builder
-WORKDIR /app/client
-COPY client/package*.json ./
-RUN npm install
-COPY client/ ./
+WORKDIR /app
+COPY package*.json ./
+COPY client/package*.json ./client/
+COPY server/package*.json ./server/
+RUN npm ci --workspace=client
+COPY client/ ./client/
 ENV VITE_API_URL=""
-RUN npm run build
+RUN npm run build --workspace=client
 
 # Stage 2: Build Backend
 FROM node:22-alpine AS server-builder
@@ -15,7 +17,7 @@ COPY package*.json ./
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
 COPY prisma/ ./prisma/
-RUN npm install --workspace=server
+RUN npm ci --workspace=server
 RUN npx prisma generate --schema=prisma/schema.prisma
 COPY server/ ./server/
 RUN npm run build --workspace=server
@@ -37,7 +39,7 @@ EXPOSE 3000
 COPY package*.json ./
 COPY server/package*.json ./server/
 COPY client/package*.json ./client/
-RUN npm install --omit=dev --workspace=server
+RUN npm ci --omit=dev --workspace=server
 
 COPY --from=server-builder /app/prisma ./prisma
 COPY --from=server-builder /app/node_modules/.prisma ./node_modules/.prisma

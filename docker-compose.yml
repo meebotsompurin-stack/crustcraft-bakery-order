@@ -4,13 +4,13 @@ services:
     container_name: crustcraft-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: crustcraft_test
+      POSTGRES_USER: ${POSTGRES_USER:-crustcraft}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crustcraft_password}
+      POSTGRES_DB: ${POSTGRES_DB:-crustcraft}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d crustcraft_test"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crustcraft} -d ${POSTGRES_DB:-crustcraft}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -25,10 +25,10 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: "postgresql://postgres:postgres@db:5432/crustcraft_test?schema=public"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-crustcraft}:${POSTGRES_PASSWORD:-crustcraft_password}@db:5432/${POSTGRES_DB:-crustcraft}?schema=public"
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-supersecret_admin_pass}
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-supersecret_demo_pass}
-      SEED_DEMO_DATA: "true"
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
     command: sh -c "npx prisma migrate deploy && npm run seed"
     restart: "no"
 
@@ -42,16 +42,17 @@ services:
       migrate:
         condition: service_completed_successfully
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:3000"
     environment:
-      DATABASE_URL: "postgresql://postgres:postgres@db:5432/crustcraft_test?schema=public"
-      PORT: 3000
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-crustcraft}:${POSTGRES_PASSWORD:-crustcraft_password}@db:5432/${POSTGRES_DB:-crustcraft}?schema=public"
+      PORT: ${PORT:-3000}
       NODE_ENV: production
       JWT_SECRET: ${JWT_SECRET:-crustcraft-dev-jwt-secret-replace-in-production-2026}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-supersecret_admin_pass}
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-supersecret_demo_pass}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3000}/api/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
