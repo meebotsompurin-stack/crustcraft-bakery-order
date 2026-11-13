@@ -3,7 +3,9 @@ import request from 'supertest';
 import { execSync } from 'child_process';
 import path from 'path';
 
-process.env.DATABASE_URL = 'file:./test.db';
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://crustcraft:crustcraft_test_password@localhost:5432/crustcraft_test?schema=public';
+}
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'crustcraft-api-test-jwt-secret-2026';
 }
@@ -30,7 +32,7 @@ describe('F-02 Bakery Catalog API Integration Tests (CAT-01 to CAT-05)', () => {
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
     execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-      env: { ...process.env, DATABASE_URL: 'file:./test.db' },
+      env: { ...process.env },
       stdio: 'pipe',
     });
 
@@ -51,9 +53,16 @@ describe('F-02 Bakery Catalog API Integration Tests (CAT-01 to CAT-05)', () => {
     });
 
     // Clean up any stale test items
-    await prisma.bakeryItem.deleteMany({
-      where: { id: { in: ownedItemIds } },
-    });
+    try {
+      await prisma.orderItem.deleteMany({
+        where: { bakeryItemId: { in: ownedItemIds } },
+      });
+      await prisma.bakeryItem.deleteMany({
+        where: { id: { in: ownedItemIds } },
+      });
+    } catch {
+      // Ignore if items do not exist
+    }
 
     // 1. Active item with positive stock
     await prisma.bakeryItem.create({
@@ -96,14 +105,29 @@ describe('F-02 Bakery Catalog API Integration Tests (CAT-01 to CAT-05)', () => {
   });
 
   afterAll(async () => {
-    await prisma.bakeryItem.deleteMany({
-      where: { id: { in: ownedItemIds } },
-    });
-
-    if (testCustomer?.id) {
-      await prisma.user.deleteMany({
-        where: { id: testCustomer.id },
+    try {
+      await prisma.orderItem.deleteMany({
+        where: { bakeryItemId: { in: ownedItemIds } },
       });
+      await prisma.bakeryItem.deleteMany({
+        where: { id: { in: ownedItemIds } },
+      });
+
+      if (testCustomer?.id) {
+        await prisma.orderItem.deleteMany({
+          where: { order: { customerId: testCustomer.id } },
+        });
+        await prisma.order.deleteMany({
+          where: { customerId: testCustomer.id },
+        });
+        await prisma.user.deleteMany({
+          where: { id: testCustomer.id },
+        });
+      }
+    } catch (e) {
+      // Ignore teardown errors
+    } finally {
+      await prisma.$disconnect();
     }
   });
 
