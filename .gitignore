@@ -40,3 +40,8 @@ coverage/
 # Playwright
 test-results/
 playwright-report/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*.class
