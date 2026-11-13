@@ -31,14 +31,10 @@ describe('F-04 Operator Order Queue & Acceptance API Tests (OPS-01 to OPS-08)', 
 
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
-    try {
-      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-        env: { ...process.env },
-        stdio: 'pipe',
-      });
-    } catch (error) {
-      console.warn('Prisma migrate deploy note in operator test:', error instanceof Error ? error.message : error);
-    }
+    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+      env: { ...process.env },
+      stdio: 'pipe',
+    });
 
     const pwdHash = await hashPassword('password123');
 

@@ -31,14 +31,10 @@ describe('F-02 Bakery Catalog API Integration Tests (CAT-01 to CAT-05)', () => {
 
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
-    try {
-      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-        env: { ...process.env },
-        stdio: 'pipe',
-      });
-    } catch (error) {
-      console.warn('Prisma migrate deploy note in catalog test:', error instanceof Error ? error.message : error);
-    }
+    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+      env: { ...process.env },
+      stdio: 'pipe',
+    });
 
     // Create authenticated test customer
     const customerEmail = `cat.customer.${testRunId}@test.com`;

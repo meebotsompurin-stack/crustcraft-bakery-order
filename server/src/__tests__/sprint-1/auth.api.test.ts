@@ -28,14 +28,10 @@ describe('F-01 Authentication & RBAC API Integration Tests (AUTH-01 to AUTH-07, 
 
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
-    try {
-      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-        env: { ...process.env },
-        stdio: 'pipe',
-      });
-    } catch (error) {
-      console.warn('Prisma migrate deploy note in auth test:', error instanceof Error ? error.message : error);
-    }
+    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+      env: { ...process.env },
+      stdio: 'pipe',
+    });
 
     try {
       const staleUsers = await prisma.user.findMany({

@@ -39,14 +39,10 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
 
   beforeAll(async () => {
     const schemaPath = path.resolve(__dirname, '../../../../prisma/schema.prisma');
-    try {
-      execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
-        env: { ...process.env },
-        stdio: 'pipe',
-      });
-    } catch (error) {
-      console.warn('Prisma migrate deploy note in orders test:', error instanceof Error ? error.message : error);
-    }
+    execSync(`npx prisma migrate deploy --schema="${schemaPath}"`, {
+      env: { ...process.env },
+      stdio: 'pipe',
+    });
 
     // Create 2 test customers for ownership isolation verification (BR-04)
     customer1 = await prisma.user.create({
