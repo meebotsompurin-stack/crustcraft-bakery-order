@@ -1,6 +1,6 @@
 # CrustCraft Artisan Bakery — Deployment & Cloud Infrastructure Specification
 ## Lab 5: Cloud Deployment and CI/CD Pipeline on Google Cloud Platform (GCP)
-### Document Version: 1.1.0-issue02 (Episode 2 Cloud-Ready Refactor)
+### Document Version: 1.1.0-issue03 (Episode 3 Docker Compose)
 
 ---
 
@@ -166,12 +166,25 @@ cp .env.example .env
 npm ci
 npm run dev
 
-# Containerized execution via Docker Compose
+# Containerized execution via Docker Compose (Multi-stage build, Postgres 16, Auto-migration)
 docker compose up --build -d
+
+# Inspect service statuses and logs
 docker compose ps -a
+docker compose logs -f app
+
+# Health & Readiness probe verification
 curl -f http://localhost:3000/api/health
 curl -f http://localhost:3000/api/ready
+
+# Graceful teardown (with volume cleanup)
+docker compose down -v
 ```
+
+#### Docker Compose Service Topology:
+1. **`db` (`postgres:16-alpine`):** PostgreSQL database engine listening on container port `5432`. Includes persistent volume `postgres_data` and healthcheck via `pg_isready`.
+2. **`migrate` (`crustcraft-migrate`):** Ephemeral container built from root `Dockerfile`. Waits for `db` to be healthy (`condition: service_healthy`), executes `npx prisma migrate deploy && npm run seed`, then exits cleanly with code 0.
+3. **`app` (`crustcraft-app`):** Web container built from root `Dockerfile`. Waits for `migrate` to succeed (`condition: service_completed_successfully`), binds to `0.0.0.0:3000` mapped to host `3000:3000`, serves the compiled React Vite SPA and Express REST API as non-root `node` user.
 
 ### 5.2 Database Migration & Seeding Commands
 ```bash
