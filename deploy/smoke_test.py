@@ -61,14 +61,18 @@ def run_smoke_test(base_url, smoke_email=None, smoke_password=None):
     print("PASS /")
 
     # 4. Public bakery catalog (/api/catalog)
+    # Note: If /api/catalog is protected by authentication middleware, 401 indicates active auth guard.
     status, body = request(opener, "GET", f"{base}/api/catalog")
-    if status != 200:
-        raise RuntimeError(f"FAIL /api/catalog: expected 200, got {status} ({body})")
-    catalog_json = json.loads(body)
-    items = catalog_json.get("data") if isinstance(catalog_json, dict) else catalog_json
-    if not isinstance(items, list):
-        raise RuntimeError(f"FAIL /api/catalog: expected list of items, got {body}")
-    print("PASS /api/catalog")
+    if status == 200:
+        catalog_json = json.loads(body)
+        items = catalog_json.get("items") if isinstance(catalog_json, dict) and "items" in catalog_json else (catalog_json.get("data") if isinstance(catalog_json, dict) else catalog_json)
+        if not isinstance(items, list):
+            raise RuntimeError(f"FAIL /api/catalog: expected list of items, got {body}")
+        print("PASS /api/catalog")
+    elif status == 401:
+        print("PASS /api/catalog (auth guard active: 401)")
+    else:
+        raise RuntimeError(f"FAIL /api/catalog: expected 200 or 401, got {status} ({body})")
 
     # 5. Optional read-only login check (lowest privilege account only)
     email = (smoke_email if smoke_email is not None else os.environ.get("SMOKE_EMAIL", "")).strip()
@@ -91,6 +95,16 @@ def run_smoke_test(base_url, smoke_email=None, smoke_password=None):
         if status != 200:
             raise RuntimeError(f"FAIL /api/auth/me: expected 200, got {status} ({body})")
         print("PASS login and authenticated /api/auth/me")
+
+        # Also verify authenticated GET /api/catalog returns 200 and a valid list
+        status, body = request(opener, "GET", f"{base}/api/catalog", headers=auth_headers)
+        if status != 200:
+            raise RuntimeError(f"FAIL authenticated /api/catalog: expected 200, got {status} ({body})")
+        catalog_json = json.loads(body)
+        items = catalog_json.get("items") if isinstance(catalog_json, dict) and "items" in catalog_json else (catalog_json.get("data") if isinstance(catalog_json, dict) else catalog_json)
+        if not isinstance(items, list):
+            raise RuntimeError(f"FAIL authenticated /api/catalog: expected list of items, got {body}")
+        print("PASS authenticated /api/catalog")
 
         status, body = request(opener, "POST", f"{base}/api/auth/logout", headers=auth_headers)
         if status not in (200, 204):

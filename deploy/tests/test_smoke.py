@@ -16,6 +16,8 @@ spec.loader.exec_module(smoke_test)
 
 class MockCrustCraftHandler(http.server.BaseHTTPRequestHandler):
     ready_status = 200
+    catalog_status = None  # None = dynamic by auth, or int (e.g. 500)
+    catalog_requires_auth = True
 
     def log_message(self, format, *args):
         pass
@@ -44,7 +46,18 @@ class MockCrustCraftHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html)
         elif self.path == "/api/catalog":
-            self._send_json(200, {"data": [{"id": 1, "name": "Artisan Butter Croissant", "price": 8500}]})
+            if self.__class__.catalog_status is not None:
+                self._send_json(self.__class__.catalog_status, {"error": "catalog error"})
+                return
+
+            auth_header = self.headers.get("Authorization", "")
+            if self.__class__.catalog_requires_auth:
+                if auth_header.startswith("Bearer "):
+                    self._send_json(200, {"data": [{"id": 1, "name": "Artisan Butter Croissant", "price": 8500}]})
+                else:
+                    self._send_json(401, {"error": "unauthorized"})
+            else:
+                self._send_json(200, {"data": [{"id": 1, "name": "Artisan Butter Croissant", "price": 8500}]})
         elif self.path == "/api/auth/me":
             self._send_json(200, {"data": {"email": "customer1@test.com", "role": "CUSTOMER"}})
         else:
@@ -75,8 +88,15 @@ class SmokeTestUnitSuite(unittest.TestCase):
 
     def setUp(self):
         MockCrustCraftHandler.ready_status = 200
+        MockCrustCraftHandler.catalog_status = None
+        MockCrustCraftHandler.catalog_requires_auth = True
 
-    def test_smoke_passes_without_login(self):
+    def test_smoke_passes_without_login_auth_guarded_catalog(self):
+        MockCrustCraftHandler.catalog_requires_auth = True
+        smoke_test.run_smoke_test(self.base_url, smoke_email="", smoke_password="")
+
+    def test_smoke_passes_without_login_public_catalog(self):
+        MockCrustCraftHandler.catalog_requires_auth = False
         smoke_test.run_smoke_test(self.base_url, smoke_email="", smoke_password="")
 
     def test_smoke_passes_with_login(self):
@@ -88,6 +108,11 @@ class SmokeTestUnitSuite(unittest.TestCase):
 
     def test_smoke_fails_when_ready_returns_503(self):
         MockCrustCraftHandler.ready_status = 503
+        with self.assertRaises(RuntimeError):
+            smoke_test.run_smoke_test(self.base_url, smoke_email="", smoke_password="")
+
+    def test_smoke_fails_when_catalog_returns_500(self):
+        MockCrustCraftHandler.catalog_status = 500
         with self.assertRaises(RuntimeError):
             smoke_test.run_smoke_test(self.base_url, smoke_email="", smoke_password="")
 
