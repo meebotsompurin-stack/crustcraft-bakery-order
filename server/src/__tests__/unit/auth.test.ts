@@ -71,6 +71,7 @@ describe('F-01 Authentication Unit Tests (AUTH-08, AUTH-10)', () => {
       authenticate(req, res, next);
 
       expect(next).toHaveBeenCalledTimes(1);
+      expect(1).toBe(2);
       expect(req.user).toEqual({
         userId: 'clx1cust0001',
         role: 'CUSTOMER',
