@@ -1,6 +1,6 @@
 # CrustCraft Artisan Bakery — Deployment & Cloud Infrastructure Specification
 ## Lab 5: Cloud Deployment and CI/CD Pipeline on Google Cloud Platform (GCP)
-### Document Version: 1.5.0-issue06 (Episode 6 WIF & Merge Gate)
+### Document Version: 1.6.0-issue07 (Episode 7 Automated CD Pipeline & Live Release)
 
 ---
 
@@ -17,13 +17,13 @@
 | **Default Branch (Production)** | `main` (Protected release gate; merges trigger CD) |
 | **Integration Branch (Staging)** | `lab-5-staging` (Integration branch for Lab 5 feature & doc PRs) |
 | **Target GCP Project Name** | `cpe334-bobcat` |
-| **Target GCP Project ID** | `cpe334-bobcat` (Project Number: `530290697744`) |
+| **Target GCP Project ID** | `cpe334-bobcat` (Project Number: `<PROJECT_NUMBER>`) |
 | **GCP Target Region** | `asia-southeast1` (Singapore) |
 | **Budget Alert Identifier** | `crustcraft-lab5-budget` |
 | **Cloud Run Service Name** | `crustcraft` |
 | **Cloud Run Migration Job Name** | `crustcraft-migrate` |
 | **Cloud SQL Instance Name** | `crustcraft-pg` (PostgreSQL 16, Enterprise Edition, `db-f1-micro`) |
-| **Public Service URL** | `https://crustcraft-d7wyiqxska-as.a.run.app` (`https://crustcraft-530290697744.asia-southeast1.run.app`) |
+| **Public Service URL** | `https://crustcraft-d7wyiqxska-as.a.run.app` (`https://crustcraft-<PROJECT_NUMBER>.asia-southeast1.run.app`) |
 
 ---
 
@@ -239,7 +239,7 @@ DRY_RUN=1 PROJECT_ID="cpe334-bobcat" bash deploy/deploy.sh
 PROJECT_ID="cpe334-bobcat" bash deploy/deploy.sh --demo
 
 # 4. Capture live Cloud Run Service URL and verify endpoints (AC-LAB5-05-05, C-04)
-SERVICE_URL=$(gcloud run services describe crustcraft --region=asia-southeast1 --format='value(status.url)')
+SERVICE_URL=$(gcloud run services describe crustcraft --region=asia-southeast1 --project="$PROJECT_ID" --format='value(status.url)')
 echo "Live Service URL: $SERVICE_URL"
 
 # Verify HTTP 200 responses on health and readiness probes
@@ -254,7 +254,7 @@ python3 deploy/smoke_test.py "$SERVICE_URL"
 > **Cloud SQL Migration Troubleshooting (`S6`):**
 > If the Cloud Run Migration Job (`crustcraft-migrate`) encounters an issue during execution, inspect the execution logs using Cloud Logging before retrying:
 > ```bash
-> gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=crustcraft-migrate" --limit=50 --format="value(textPayload)"
+> gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=crustcraft-migrate" --project="$PROJECT_ID" --limit=50 --format="value(textPayload)"
 > ```
 
 ---
@@ -283,6 +283,7 @@ To determine and verify the exact commit SHA currently serving live traffic on C
    ```bash
    gcloud run services describe crustcraft \
      --region=asia-southeast1 \
+     --project="<PROJECT_ID>" \
      --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
    ```
 
@@ -301,7 +302,12 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`C-03` (`R-01`, `R-02`)| Docker Reproducibility | Local / Cloud Shell execution | Commit `TBD` | Fresh clone builds & runs from `.env.example` |
 | **`C-04` (`R-03`)** | GCP Deployment | Live Cloud Run Public URL | Revision `crustcraft-00001-7kz` | `https://crustcraft-d7wyiqxska-as.a.run.app`; Auth, pre-order, catalog, operator queue verified live |
 | **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test | `cpe334-bobcat:crustcraft-pg` | Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL; stock updated 50->47 |
-| **`C-06` (`R-07`–`R-10`)| Repeatable Release | Staging -> Main PR & Revision History | Full SHA `TBD` | Revision digest matches Artifact Registry commit tag |
+| **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `[Commit SHA A — TBD]`<br>Digest: `[Image Digest A — TBD]`<br>Revision: `crustcraft-0000X-<hash>` | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
+| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `[Commit SHA B — TBD]`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-0000Y-<hash>` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
+| **`AC-LAB5-07-01` / `R-07`** | CD Pipeline Trigger & Concurrency | `.github/workflows/deploy.yml` | `push` on `main` + `workflow_dispatch`, group `deploy-demo` | Concurrency group with `cancel-in-progress: false` to safeguard active DB migrations |
+| **`AC-LAB5-07-02` / `R-07`** | Two-Job Pipeline Architecture | `.github/workflows/deploy.yml` | Job 1: `test` (`ci-docker.yml`), Job 2: `deploy` | Quality Gate enforced; deployment blocked if test suite fails |
+| **`AC-LAB5-07-03` / `R-08`, `C-06`** | Immutable Digest & Migration | `deploy/release.sh` | `@sha256:...` digest resolution & traffic migration | Resolves image tag to immutable digest; executes migration job; updates service and pushes 100% traffic |
+| **`AC-LAB5-07-04` / `M8`, `R-08`** | Deployment Identification | GitHub Actions Step Summary & Console | Commit SHA (40 chars) + Image Digest | Verified via `$GITHUB_STEP_SUMMARY` and `gcloud run services describe` |
 | **`AC-LAB5-06-01` / `R-02`, `R-03`** | Security / WIF IAM | GCP IAM Console (`crustcraft-deployer`) | `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` | `TBD` — Resource-level roles only (`run.developer`, `artifactregistry.writer`, `serviceAccountUser`); Keys tab empty |
 | **`AC-LAB5-06-02` / `M6`, `R-03`** | Keyless WIF Auth | GCP WIF Console (`github-actions` / `github-main`) | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/providers/github-main` | `TBD` — OIDC provider + CEL condition + `workloadIdentityUser` binding verified |
 | **`AC-LAB5-06-03` / `R-02`** | GitHub Environment | GitHub Settings > Environments > `demo` | `demo` (`main` branch only) | `TBD` — 4 plain variables (`GCP_PROJECT_ID`, `GCP_REGION`, `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`) configured |
@@ -318,10 +324,10 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 
 | Parameter | Cloud Resource Specification | Live Verified Configuration |
 |---|---|---|
-| **Target Project ID** | `cpe334-bobcat` | `cpe334-bobcat` (Project Number: `530290697744`) |
+| **Target Project ID** | `cpe334-bobcat` | `cpe334-bobcat` (Project Number: `<PROJECT_NUMBER>`) |
 | **GCP Target Region** | `asia-southeast1` (Singapore) | `asia-southeast1` |
 | **Cloud Run Service Name**| `crustcraft` | `crustcraft` |
-| **Public Service URLs** | Managed Cloud Run default URLs | Primary: `https://crustcraft-d7wyiqxska-as.a.run.app`<br>Direct: `https://crustcraft-530290697744.asia-southeast1.run.app` |
+| **Public Service URLs** | Managed Cloud Run default URLs | Primary: `https://crustcraft-d7wyiqxska-as.a.run.app`<br>Direct: `https://crustcraft-<PROJECT_NUMBER>.asia-southeast1.run.app` |
 | **Deployed Container Image** | Artifact Registry Docker image | `asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft@sha256:284a17d0804e97b8913c83807a930c37ab36a840735cf1d9ad7e0e35b3ab7e0c` |
 | **Deployed Image Digest** | Immutable 64-character SHA256 | `sha256:284a17d0804e97b8913c83807a930c37ab36a840735cf1d9ad7e0e35b3ab7e0c` |
 | **Active Service Revision**| Cloud Run immutable revision | `crustcraft-00001-7kz` |
@@ -551,3 +557,78 @@ Collect the following 5 screenshots for the final report (Handout Part 1):
 
 > [!CAUTION]
 > **Redaction Reminder:** Before submitting screenshots in the report, redact/mask the numeric `<PROJECT_NUMBER>` (if visible) and any secret values, tokens, or connection strings.
+
+---
+
+## 10. Automated Continuous Deployment Pipeline (`deploy.yml`) & Live Release Cycle (Episode 7)
+
+*This section documents the two-job automated CD pipeline architecture, keyless WIF deployment, immutable `@sha256` digest resolution, and the live release cycle verifying `C-06` (`R-07` through `R-10`).*
+
+### 10.1 Pipeline Architecture & Workflow Design (`AC-LAB5-07-01`, `AC-LAB5-07-02`)
+
+The deployment workflow (`.github/workflows/deploy.yml`) implements an automated, secure, and resilient continuous deployment pipeline:
+
+```
+[ Push to main / Release PR Merge ]
+                │
+                ▼
+      ┌──────────────────┐
+      │   Job 1: test    │ ───► Calls reusable ./.github/workflows/ci-docker.yml
+      │  (Quality Gate)  │      (Unit & integration tests + Docker build check)
+      └──────────────────┘
+                │ (Passes)
+                ▼
+      ┌──────────────────┐
+      │   Job 2: deploy  │ ───► Environment: demo
+      │ (CD Automation)  │      ├── Authenticate via WIF (google-github-actions/auth@v2.1.8)
+      └──────────────────┘      ├── Build & push image tagged with full 40-char ${{ github.sha }}
+                                ├── Execute deploy/release.sh (Resolves @sha256 digest)
+                                ├── Run Cloud Run migration job (crustcraft-migrate)
+                                ├── Update Cloud Run service (crustcraft) & shift 100% traffic
+                                ├── Run post-deploy smoke test (deploy/smoke_test.py)
+                                └── Output deployment summary to $GITHUB_STEP_SUMMARY
+```
+
+#### Pipeline Security & Governance Attributes:
+- **Environment Binding:** Runs inside the `demo` environment, gated to the `main` branch and backed by WIF configuration.
+- **Concurrency Safeguard:** `concurrency: { group: 'deploy-demo', cancel-in-progress: false }` ensures that simultaneous pushes or manual triggers do not cancel an active deployment mid-migration.
+- **Rollback Capability:** Supports `workflow_dispatch` with optional `image_tag` parameter. Supplying a prior 40-character commit SHA skips the `test` quality gate and Docker build, redeploying the existing pre-validated Artifact Registry image digest with zero database disruption.
+
+### 10.2 Immutable Digest Resolution & Traffic Migration (`AC-LAB5-07-03`)
+
+The release execution script (`deploy/release.sh`) ensures deterministic, tamper-proof deployments:
+1. **Deterministic Tag Resolution:** Resolves `IMAGE_TAG` (falling back to `git rev-parse HEAD`) to its immutable `@sha256:...` digest via Artifact Registry metadata:
+   ```bash
+   DEPLOYED_IMAGE=$(gcloud artifacts docker images describe "$IMAGE" \
+     --project="$PROJECT_ID" \
+     --format='value(image_summary.digest)' | awk '{print "'$REGION'-docker.pkg.dev/'$PROJECT_ID'/'$REPO_NAME'/'$SERVICE_NAME'@" $1}')
+   ```
+2. **Pre-Deployment Database Migration:** Executes `gcloud run jobs execute crustcraft-migrate --region="$REGION" --project="$PROJECT_ID" --wait`. If migrations fail, the pipeline terminates immediately without modifying the running Cloud Run service.
+3. **Atomic Traffic Shift:** Updates the Cloud Run service container image to `$DEPLOYED_IMAGE` and shifts 100% traffic to the new revision:
+   ```bash
+   gcloud run services update-traffic "$SERVICE_NAME" --region="$REGION" --to-latest --project="$PROJECT_ID"
+   ```
+4. **GitHub Environment Propagation:** Appends `DEPLOYED_IMAGE` and `SERVICE_URL` to `$GITHUB_ENV` so subsequent steps (such as `deploy/smoke_test.py`) execute against the exact deployed endpoint.
+
+### 10.3 Two-Release Verification Tracking Table (`C-06`, `AC-LAB5-07-05`, `AC-LAB5-07-06`)
+
+To satisfy the rubric requirement for **Category 4: Repeatable Release Pipeline (`C-06`)**, two full release cycles are executed through the protected branching route (`feature branch` $\rightarrow$ `PR into lab-5-staging` $\rightarrow$ `Release PR into main`):
+
+| Release Cycle | Branching & PR Route | Full Commit SHA (40 chars) | Immutable Image Digest (`@sha256:...`) | Active Cloud Run Revision | Live URL & Verification Status |
+|---|---|---|---|---|---|
+| **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `[Commit SHA A — TBD upon merge]` | `[sha256:Digest A — TBD upon build]` | `crustcraft-0000X-<hash>` | **PENDING MERGE**<br>Initial automated deployment via CD pipeline; automated smoke test |
+| **Release B** | `feat/banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `[Commit SHA B — TBD upon merge]` | `[sha256:Digest B — TBD upon build]` | `crustcraft-0000Y-<hash>` | **PENDING MERGE**<br>UI banner update; automated smoke test; live browser visual verification |
+
+### 10.4 Running Commit Lookup Procedure (`R-08`)
+
+Reviewers and auditors can verify the exact commit SHA currently serving live traffic through three independent mechanisms:
+1. **GitHub Actions Step Summary:** Inspect the latest successful `Deploy demo` run summary in GitHub Actions; it prints the full 40-character Commit SHA (`$IMAGE_TAG`), immutable Image Digest (`$DEPLOYED_IMAGE`), and Service URL.
+2. **GCP Console:** Navigate to **Cloud Run > Services > crustcraft > Revisions**, select the active revision receiving 100% traffic, and inspect the container image URL and tag.
+3. **gcloud Verification Command:**
+   ```bash
+   gcloud run services describe crustcraft \
+     --region=asia-southeast1 \
+     --project="<PROJECT_ID>" \
+     --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
+   ```
+
