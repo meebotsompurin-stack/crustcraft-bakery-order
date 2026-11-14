@@ -10,6 +10,7 @@ REGION="${REGION:-asia-southeast1}"
 REPO_NAME="${REPO_NAME:-crustcraft}"
 SERVICE_NAME="${SERVICE_NAME:-crustcraft}"
 MIGRATE_JOB_NAME="${MIGRATE_JOB_NAME:-crustcraft-migrate}"
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse HEAD 2>/dev/null || echo "")}"
 IMAGE_TAG="${IMAGE_TAG:?ERROR: IMAGE_TAG is required}"
 ROLLBACK="${ROLLBACK:-false}"
 
@@ -18,19 +19,16 @@ if [[ ! "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
   exit 1
 fi
 
-IMAGE_REPO="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}"
+IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:${IMAGE_TAG}"
 
-echo "Resolving immutable digest for ${IMAGE_REPO}:${IMAGE_TAG} ..."
-DIGEST="$(gcloud artifacts docker images describe "${IMAGE_REPO}:${IMAGE_TAG}" \
-  --format='value(image_summary.digest)' \
-  --project="$PROJECT_ID")"
+echo "Resolving immutable digest for ${IMAGE} ..."
+DEPLOYED_IMAGE=$(gcloud artifacts docker images describe "$IMAGE" --format='value(image_summary.digest)' | awk '{print "'$REGION'-docker.pkg.dev/'$PROJECT_ID'/'$REPO_NAME'/'$SERVICE_NAME'@" $1}')
 
-if [[ -z "$DIGEST" || ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-  echo "ERROR: Image digest not found or invalid for ${IMAGE_REPO}:${IMAGE_TAG} (got: '${DIGEST:-empty}')." >&2
+if [[ -z "$DEPLOYED_IMAGE" || ! "$DEPLOYED_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]; then
+  echo "ERROR: Image digest not found or invalid for ${IMAGE} (got: '${DEPLOYED_IMAGE:-empty}')." >&2
   exit 1
 fi
 
-DEPLOYED_IMAGE="${IMAGE_REPO}@${DIGEST}"
 echo "Resolved immutable image: ${DEPLOYED_IMAGE}"
 
 if [[ "$ROLLBACK" == "true" ]]; then
@@ -39,29 +37,24 @@ else
   echo "Updating and executing Cloud Run migration job ${MIGRATE_JOB_NAME} ..."
   gcloud run jobs update "$MIGRATE_JOB_NAME" \
     --image="$DEPLOYED_IMAGE" \
-    --region="$REGION" \
-    --project="$PROJECT_ID"
+    --region="$REGION"
 
   gcloud run jobs execute "$MIGRATE_JOB_NAME" \
     --region="$REGION" \
-    --wait \
-    --project="$PROJECT_ID"
+    --wait
 fi
 
 echo "Updating Cloud Run service ${SERVICE_NAME} to ${DEPLOYED_IMAGE} ..."
 gcloud run services update "$SERVICE_NAME" \
   --image="$DEPLOYED_IMAGE" \
-  --region="$REGION" \
-  --project="$PROJECT_ID"
+  --region="$REGION"
 
 gcloud run services update-traffic "$SERVICE_NAME" \
   --region="$REGION" \
-  --to-latest \
-  --project="$PROJECT_ID"
+  --to-latest
 
 SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" \
   --region="$REGION" \
-  --project="$PROJECT_ID" \
   --format='value(status.url)')"
 
 if [[ -z "$SERVICE_URL" ]]; then
