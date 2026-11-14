@@ -239,7 +239,7 @@ DRY_RUN=1 PROJECT_ID="cpe334-bobcat" bash deploy/deploy.sh
 PROJECT_ID="cpe334-bobcat" bash deploy/deploy.sh --demo
 
 # 4. Capture live Cloud Run Service URL and verify endpoints (AC-LAB5-05-05, C-04)
-SERVICE_URL=$(gcloud run services describe crustcraft --region=asia-southeast1 --format='value(status.url)')
+SERVICE_URL=$(gcloud run services describe crustcraft --region=asia-southeast1 --project="$PROJECT_ID" --format='value(status.url)')
 echo "Live Service URL: $SERVICE_URL"
 
 # Verify HTTP 200 responses on health and readiness probes
@@ -254,7 +254,7 @@ python3 deploy/smoke_test.py "$SERVICE_URL"
 > **Cloud SQL Migration Troubleshooting (`S6`):**
 > If the Cloud Run Migration Job (`crustcraft-migrate`) encounters an issue during execution, inspect the execution logs using Cloud Logging before retrying:
 > ```bash
-> gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=crustcraft-migrate" --limit=50 --format="value(textPayload)"
+> gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=crustcraft-migrate" --project="$PROJECT_ID" --limit=50 --format="value(textPayload)"
 > ```
 
 ---
@@ -283,6 +283,7 @@ To determine and verify the exact commit SHA currently serving live traffic on C
    ```bash
    gcloud run services describe crustcraft \
      --region=asia-southeast1 \
+     --project="<PROJECT_ID>" \
      --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
    ```
 
@@ -598,12 +599,14 @@ The deployment workflow (`.github/workflows/deploy.yml`) implements an automated
 The release execution script (`deploy/release.sh`) ensures deterministic, tamper-proof deployments:
 1. **Deterministic Tag Resolution:** Resolves `IMAGE_TAG` (falling back to `git rev-parse HEAD`) to its immutable `@sha256:...` digest via Artifact Registry metadata:
    ```bash
-   DEPLOYED_IMAGE=$(gcloud artifacts docker images describe "$IMAGE" --format='value(image_summary.digest)' | awk '{print "'$REGION'-docker.pkg.dev/'$PROJECT_ID'/'$REPO_NAME'/'$SERVICE_NAME'@" $1}')
+   DEPLOYED_IMAGE=$(gcloud artifacts docker images describe "$IMAGE" \
+     --project="$PROJECT_ID" \
+     --format='value(image_summary.digest)' | awk '{print "'$REGION'-docker.pkg.dev/'$PROJECT_ID'/'$REPO_NAME'/'$SERVICE_NAME'@" $1}')
    ```
-2. **Pre-Deployment Database Migration:** Executes `gcloud run jobs execute crustcraft-migrate --region="$REGION" --wait`. If migrations fail, the pipeline terminates immediately without modifying the running Cloud Run service.
+2. **Pre-Deployment Database Migration:** Executes `gcloud run jobs execute crustcraft-migrate --region="$REGION" --project="$PROJECT_ID" --wait`. If migrations fail, the pipeline terminates immediately without modifying the running Cloud Run service.
 3. **Atomic Traffic Shift:** Updates the Cloud Run service container image to `$DEPLOYED_IMAGE` and shifts 100% traffic to the new revision:
    ```bash
-   gcloud run services update-traffic "$SERVICE_NAME" --region="$REGION" --to-latest
+   gcloud run services update-traffic "$SERVICE_NAME" --region="$REGION" --to-latest --project="$PROJECT_ID"
    ```
 4. **GitHub Environment Propagation:** Appends `DEPLOYED_IMAGE` and `SERVICE_URL` to `$GITHUB_ENV` so subsequent steps (such as `deploy/smoke_test.py`) execute against the exact deployed endpoint.
 
@@ -625,6 +628,7 @@ Reviewers and auditors can verify the exact commit SHA currently serving live tr
    ```bash
    gcloud run services describe crustcraft \
      --region=asia-southeast1 \
+     --project="<PROJECT_ID>" \
      --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
    ```
 

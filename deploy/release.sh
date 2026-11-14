@@ -22,7 +22,9 @@ fi
 IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:${IMAGE_TAG}"
 
 echo "Resolving immutable digest for ${IMAGE} ..."
-DEPLOYED_IMAGE=$(gcloud artifacts docker images describe "$IMAGE" --format='value(image_summary.digest)' | awk '{print "'$REGION'-docker.pkg.dev/'$PROJECT_ID'/'$REPO_NAME'/'$SERVICE_NAME'@" $1}')
+DEPLOYED_IMAGE=$(gcloud artifacts docker images describe "$IMAGE" \
+  --project="$PROJECT_ID" \
+  --format='value(image_summary.digest)' | awk '{print "'$REGION'-docker.pkg.dev/'$PROJECT_ID'/'$REPO_NAME'/'$SERVICE_NAME'@" $1}')
 
 if [[ -z "$DEPLOYED_IMAGE" || ! "$DEPLOYED_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]; then
   echo "ERROR: Image digest not found or invalid for ${IMAGE} (got: '${DEPLOYED_IMAGE:-empty}')." >&2
@@ -37,24 +39,29 @@ else
   echo "Updating and executing Cloud Run migration job ${MIGRATE_JOB_NAME} ..."
   gcloud run jobs update "$MIGRATE_JOB_NAME" \
     --image="$DEPLOYED_IMAGE" \
-    --region="$REGION"
+    --region="$REGION" \
+    --project="$PROJECT_ID"
 
   gcloud run jobs execute "$MIGRATE_JOB_NAME" \
     --region="$REGION" \
+    --project="$PROJECT_ID" \
     --wait
 fi
 
 echo "Updating Cloud Run service ${SERVICE_NAME} to ${DEPLOYED_IMAGE} ..."
 gcloud run services update "$SERVICE_NAME" \
   --image="$DEPLOYED_IMAGE" \
-  --region="$REGION"
+  --region="$REGION" \
+  --project="$PROJECT_ID"
 
 gcloud run services update-traffic "$SERVICE_NAME" \
   --region="$REGION" \
-  --to-latest
+  --to-latest \
+  --project="$PROJECT_ID"
 
 SERVICE_URL="$(gcloud run services describe "$SERVICE_NAME" \
   --region="$REGION" \
+  --project="$PROJECT_ID" \
   --format='value(status.url)')"
 
 if [[ -z "$SERVICE_URL" ]]; then
