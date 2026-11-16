@@ -56,12 +56,12 @@ jobs:
           [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo 'Image tag must be a full 40-character commit SHA.'; exit 1; }
 
       - name: Authenticate to Google Cloud via WIF
-        uses: google-github-actions/auth@71f9e21972fae77b1222eecda1753174e62630f5 # v2.1.8
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
-      - uses: google-github-actions/setup-gcloud@6184eb66b576856555c5dfc14041b6c7a0d4c82c # v2.1.1
+      - uses: google-github-actions/setup-gcloud@v2
 
       - name: Build and push image
         if: env.ROLLBACK != 'true'
