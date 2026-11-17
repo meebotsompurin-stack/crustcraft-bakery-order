@@ -302,8 +302,8 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`C-03` (`R-01`, `R-02`)| Docker Reproducibility | Local / Cloud Shell execution | Commit `TBD` | Fresh clone builds & runs from `.env.example` |
 | **`C-04` (`R-03`)** | GCP Deployment | Live Cloud Run Public URL | Revision `crustcraft-00001-7kz` | `https://crustcraft-d7wyiqxska-as.a.run.app`; Auth, pre-order, catalog, operator queue verified live |
 | **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test | `cpe334-bobcat:crustcraft-pg` | Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL; stock updated 50->47 |
-| **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `[Commit SHA A — TBD]`<br>Digest: `[Image Digest A — TBD]`<br>Revision: `crustcraft-0000X-<hash>` | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
-| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `[Commit SHA B — TBD]`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-0000Y-<hash>` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
+| **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`<br>Digest: `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`<br>Revision: `crustcraft-00002-...` | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
+| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `[Commit SHA B — TBD]`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-00003-...` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
 | **`AC-LAB5-07-01` / `R-07`** | CD Pipeline Trigger & Concurrency | `.github/workflows/deploy.yml` | `push` on `main` + `workflow_dispatch`, group `deploy-demo` | Concurrency group with `cancel-in-progress: false` to safeguard active DB migrations |
 | **`AC-LAB5-07-02` / `R-07`** | Two-Job Pipeline Architecture | `.github/workflows/deploy.yml` | Job 1: `test` (`ci-docker.yml`), Job 2: `deploy` | Quality Gate enforced; deployment blocked if test suite fails |
 | **`AC-LAB5-07-03` / `R-08`, `C-06`** | Immutable Digest & Migration | `deploy/release.sh` | `@sha256:...` digest resolution & traffic migration | Resolves image tag to immutable digest; executes migration job; updates service and pushes 100% traffic |
@@ -616,8 +616,8 @@ To satisfy the rubric requirement for **Category 4: Repeatable Release Pipeline 
 
 | Release Cycle | Branching & PR Route | Full Commit SHA (40 chars) | Immutable Image Digest (`@sha256:...`) | Active Cloud Run Revision | Live URL & Verification Status |
 |---|---|---|---|---|---|
-| **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `[Commit SHA A — TBD upon merge]` | `[sha256:Digest A — TBD upon build]` | `crustcraft-0000X-<hash>` | **PENDING MERGE**<br>Initial automated deployment via CD pipeline; automated smoke test |
-| **Release B** | `feat/banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `[Commit SHA B — TBD upon merge]` | `[sha256:Digest B — TBD upon build]` | `crustcraft-0000Y-<hash>` | **PENDING MERGE**<br>UI banner update; automated smoke test; live browser visual verification |
+| **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00002-...` | **DEPLOYED & VERIFIED**<br>Initial automated deployment via CD pipeline; automated smoke test PASSED |
+| **Release B** | `feat/release-b-banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `[Commit SHA B — TBD upon merge]` | `[sha256:Digest B — TBD upon build]` | `crustcraft-00003-...` | **PENDING MERGE**<br>UI banner update ("CrustCraft Bakery (Release B)"); automated smoke test; live browser visual verification |
 
 ### 10.4 Running Commit Lookup Procedure (`R-08`)
 
