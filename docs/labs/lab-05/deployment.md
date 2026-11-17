@@ -304,7 +304,7 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test (Ep. 5 & Ep. 8 §11) | `cpe334-bobcat:crustcraft-pg` | Ep. 5 Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL (stock 50->47); Ep. 8 Restart (`C-05` Part A) & Rollback/Redeploy (`C-05` Part B) runbook & tracking table in §11 |
 | **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`<br>Digest: `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`<br>Revision: `crustcraft-00002-...` | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
 | **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-00003-...` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
-| **`LAB5-ISSUE-08` (Handout §5)** | Recommended Practice (Rollback) | `Deploy demo` `workflow_dispatch` & `deploy/release.sh` | `ROLLBACK=true` (`@sha256:...`) | Zero-downtime container image rollback & roll-forward protocol documented in §11 |
+| **`LAB5-ISSUE-08` (Handout §5)** | Recommended Practice (Rollback) | `Deploy demo` `workflow_dispatch` & `deploy/release.sh` | `ROLLBACK=true` (`@sha256:...`) | Fast manual container image rollback (no-rebuild traffic switch) & roll-forward protocol documented in §11 |
 | **`AC-LAB5-07-01` / `R-07`** | CD Pipeline Trigger & Concurrency | `.github/workflows/deploy.yml` | `push` on `main` + `workflow_dispatch`, group `deploy-demo` | Concurrency group with `cancel-in-progress: false` to safeguard active DB migrations |
 | **`AC-LAB5-07-02` / `R-07`** | Two-Job Pipeline Architecture | `.github/workflows/deploy.yml` | Job 1: `test` (`ci-docker.yml`), Job 2: `deploy` | Quality Gate enforced; deployment blocked if test suite fails |
 | **`AC-LAB5-07-03` / `R-08`, `C-06`** | Immutable Digest & Migration | `deploy/release.sh` | `@sha256:...` digest resolution & traffic migration | Resolves image tag to immutable digest; executes migration job; updates service and pushes 100% traffic |
@@ -638,7 +638,7 @@ Reviewers and auditors can verify the exact commit SHA currently serving live tr
 
 ## 11. Episode 8: Database Persistence Verification across Restarts & Emergency Rollback (`LAB5-ISSUE-08`)
 
-*This section provides the human-executed verification runbook, rollback/roll-forward protocol, structured tracking table, and 5-screenshot evidence checklist for **Handout `C-05` (`R-04`)** and **Recommended Practice: Zero-Downtime Manual Rollback (Handout §5, Guide Ep. 8)**.*
+*This section provides the human-executed verification runbook, rollback/roll-forward protocol, structured tracking table, and 5-screenshot evidence checklist for **Handout `C-05` (`R-04`)** and **Recommended Practice: Fast Manual Rollback (Handout §5, Guide Ep. 8)**.*
 
 > [!CAUTION]
 > **Security, AI Safety & Continuous Availability Guardrails (`R-02`, `S7`, `B1`):**
@@ -691,7 +691,7 @@ Choose one of the following GCP-native restart methods (do **not** substitute lo
 
 ---
 
-### 11.3 `AC-LAB5-08-03`: Zero-Downtime Manual Rollback Execution via `workflow_dispatch` (Recommended Practice, Handout §5 & Guide Ep. 8.1)
+### 11.3 `AC-LAB5-08-03`: Fast Manual Rollback Execution via `workflow_dispatch` (Recommended Practice, Handout §5 & Guide Ep. 8.1)
 
 Follow this exact protocol to roll back the Cloud Run container image from **Release B** to **Release A** without re-running CI, rebuilding Docker images, or rolling back the database:
 
@@ -709,8 +709,9 @@ Follow this exact protocol to roll back the Cloud Run container image from **Rel
      - Validates that `IMAGE_TAG` matches the 40-character hexadecimal SHA regex (`^[0-9a-f]{40}$`).
      - Resolves `asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft:e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` to its immutable `@sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` digest via `gcloud artifacts docker images describe`.
      - **Skips `crustcraft-migrate`** (`ROLLBACK=true`), leaving the PostgreSQL 16 schema and all live data untouched.
-     - Updates Cloud Run service `crustcraft` to Release A's immutable `@sha256:...` image digest (`gcloud run services update`) and routes 100% traffic to the latest revision (`--to-latest`).
-   - **Step `Smoke test public URL` (`python3 deploy/smoke_test.py "$SERVICE_URL"`):** Executes and passes against the rolled-back service.
+     - Updates Cloud Run service `crustcraft` to Release A's immutable `@sha256:...` image digest (`gcloud run services update`) and immediately runs `gcloud run services update-traffic --to-latest` to route 100% traffic to the latest revision (relying on Cloud Run's container startup health check).
+   - **Step `Smoke test public URL` (`python3 deploy/smoke_test.py "$SERVICE_URL"`):** Executes **post-switch** against the live public URL and verifies HTTP `200` on `/api/health`, `/api/ready`, and auth flows.
+     - *Traffic-Routing Qualification (`S6`):* Because `deploy/release.sh` shifts 100% of traffic **before** `smoke_test.py` runs, the smoke test verifies the rollback post-switch rather than gating traffic beforehand. Risk is minimal because Release A is an immutable, previously validated image digest; however, if pre-traffic validation or gradual canary shifting is required in future incidents, deploy manually with `--no-traffic`, verify the tagged revision URL (`--tag`), and then shift 100% traffic via `gcloud run services update-traffic`.
    - **Step `Record deployment summary`:** Outputs `Rollback Mode: true`, the 40-character Commit SHA of Release A, and the resolved `@sha256:...` digest to `$GITHUB_STEP_SUMMARY`.
 4. **Capture Workflow Evidence:**
    - **Screenshot 3:** GitHub Actions Rollback Run showing `test` and `Build` skipped, and `deploy` + `smoke_test` passed.
