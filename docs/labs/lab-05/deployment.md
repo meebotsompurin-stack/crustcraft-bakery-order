@@ -1,6 +1,6 @@
 # CrustCraft Artisan Bakery — Deployment & Cloud Infrastructure Specification
 ## Lab 5: Cloud Deployment and CI/CD Pipeline on Google Cloud Platform (GCP)
-### Document Version: 1.6.0-issue07 (Episode 7 Automated CD Pipeline & Live Release)
+### Document Version: 1.7.0-issue08 (Episode 8 Persistence Verification & Emergency Rollback Protocol)
 
 ---
 
@@ -301,9 +301,10 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`C-02` (`R-06`)** | Quality Gate | Failing PR from `test/prove-gate` | Commit `TBD` | `test-and-docker` failed; merge blocked |
 | **`C-03` (`R-01`, `R-02`)| Docker Reproducibility | Local / Cloud Shell execution | Commit `TBD` | Fresh clone builds & runs from `.env.example` |
 | **`C-04` (`R-03`)** | GCP Deployment | Live Cloud Run Public URL | Revision `crustcraft-00001-7kz` | `https://crustcraft-d7wyiqxska-as.a.run.app`; Auth, pre-order, catalog, operator queue verified live |
-| **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test | `cpe334-bobcat:crustcraft-pg` | Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL; stock updated 50->47 |
+| **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test (Ep. 5 & Ep. 8 §11) | `cpe334-bobcat:crustcraft-pg` | Ep. 5 Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL (stock 50->47); Ep. 8 Restart (`C-05` Part A) & Rollback/Redeploy (`C-05` Part B) runbook & tracking table in §11 |
 | **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`<br>Digest: `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`<br>Revision: `crustcraft-00002-...` | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
-| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `[Commit SHA B — TBD]`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-00003-...` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
+| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-00003-...` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
+| **`LAB5-ISSUE-08` (Handout §5)** | Recommended Practice (Rollback) | `Deploy demo` `workflow_dispatch` & `deploy/release.sh` | `ROLLBACK=true` (`@sha256:...`) | Fast manual container image rollback (no-rebuild traffic switch) & roll-forward protocol documented in §11 |
 | **`AC-LAB5-07-01` / `R-07`** | CD Pipeline Trigger & Concurrency | `.github/workflows/deploy.yml` | `push` on `main` + `workflow_dispatch`, group `deploy-demo` | Concurrency group with `cancel-in-progress: false` to safeguard active DB migrations |
 | **`AC-LAB5-07-02` / `R-07`** | Two-Job Pipeline Architecture | `.github/workflows/deploy.yml` | Job 1: `test` (`ci-docker.yml`), Job 2: `deploy` | Quality Gate enforced; deployment blocked if test suite fails |
 | **`AC-LAB5-07-03` / `R-08`, `C-06`** | Immutable Digest & Migration | `deploy/release.sh` | `@sha256:...` digest resolution & traffic migration | Resolves image tag to immutable digest; executes migration job; updates service and pushes 100% traffic |
@@ -617,7 +618,7 @@ To satisfy the rubric requirement for **Category 4: Repeatable Release Pipeline 
 | Release Cycle | Branching & PR Route | Full Commit SHA (40 chars) | Immutable Image Digest (`@sha256:...`) | Active Cloud Run Revision | Live URL & Verification Status |
 |---|---|---|---|---|---|
 | **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00002-...` | **DEPLOYED & VERIFIED**<br>Initial automated deployment via CD pipeline; automated smoke test PASSED |
-| **Release B** | `feat/release-b-banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `[Commit SHA B — TBD upon merge]` | `[sha256:Digest B — TBD upon build]` | `crustcraft-00003-...` | **PENDING MERGE**<br>UI banner update ("CrustCraft Bakery (Release B)"); automated smoke test; live browser visual verification |
+| **Release B** | `feat/release-b-banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `[sha256:Digest B — TBD upon build]` | `crustcraft-00003-...` | **DEPLOYED & VERIFIED**<br>UI banner update ("CrustCraft Bakery (Release B)"); automated smoke test; live browser visual verification |
 
 ### 10.4 Running Commit Lookup Procedure (`R-08`)
 
@@ -632,3 +633,152 @@ Reviewers and auditors can verify the exact commit SHA currently serving live tr
      --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
    ```
 
+
+---
+
+## 11. Episode 8: Database Persistence Verification across Restarts & Emergency Rollback (`LAB5-ISSUE-08`)
+
+*This section provides the human-executed verification runbook, rollback/roll-forward protocol, structured tracking table, and 5-screenshot evidence checklist for **Handout `C-05` (`R-04`)** and **Recommended Practice: Fast Manual Rollback (Handout §5, Guide Ep. 8)**.*
+
+> [!CAUTION]
+> **Security, AI Safety & Continuous Availability Guardrails (`R-02`, `S7`, `B1`):**
+> - **Zero Secret Leakage (`R-02`, `S7`):** NEVER include real passwords, `DATABASE_URL` connection strings, JWT secrets, or tokens in this document, Git commits, or screenshots. Redact or blur any sensitive data before capturing evidence screenshots.
+> - **No Autonomous Cloud/GitHub Mutations:** All `gcloud`, Cloud Run, Cloud SQL, and GitHub Actions `workflow_dispatch` operations below MUST be executed by human operators after reviewing parameters.
+> - **No Database Rollback:** Emergency rollback applies **ONLY** to the Cloud Run container image revision (`ROLLBACK=true` in `deploy/release.sh`), which skips `crustcraft-migrate` while keeping the additive PostgreSQL 16 schema and all persisted order data intact.
+> - **Continuous Availability Policy (`B1`):** **Keep Cloud Run (`crustcraft`) and Cloud SQL (`crustcraft-pg`) running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing or running teardown during this period is strictly prohibited.**
+
+---
+
+### 11.1 `AC-LAB5-08-01`: Live Production Order Creation on Release B ("Before" Baseline)
+
+Execute this procedure on the live Cloud Run Public Service URL running **Release B** to establish the "Before" persistence baseline:
+
+1. Open the live Public Service URL in a browser: `https://crustcraft-d7wyiqxska-as.a.run.app`
+2. Sign in using a `CUSTOMER` account (e.g., `customer1@test.com`). *(Reminder per `S7`: never expose or screenshot account passwords.)*
+3. Create a new bakery pre-order (for example, `Sourdough Bread` x `2` or `Artisan Butter Croissant`) with a distinct pickup note for Episode 8 persistence verification (e.g., `"Ep8 persistence check"`).
+4. Navigate to **"My Orders"** (`/orders`) and record the following baseline fields in the tracking table (§11.6):
+   - **Order ID** (e.g., `#...`)
+   - **Order Items & Quantities**
+   - **Total Amount** (THB / satang)
+   - **Order Status** (`PENDING`)
+   - **Created Timestamp**
+5. Capture **Screenshot 1 ("Before" Evidence)** showing the newly created order in **"My Orders"** with the public Cloud Run URL (`https://crustcraft-d7wyiqxska-as.a.run.app`) clearly visible in the browser address bar.
+
+---
+
+### 11.2 `AC-LAB5-08-02`: Verification of Persistence across Application Restart (`C-05` Part A, `R-04`, `S6`)
+
+#### Why CrustCraft Data Survives Container Restarts
+- **Externalized Persistent State:** All application state — users, bakery catalog stock, orders, and order items — is persisted in **Cloud SQL for PostgreSQL 16 (`crustcraft-pg`)** over a Unix socket connection (`/cloudsql/cpe334-bobcat:asia-southeast1:crustcraft-pg`).
+- **Stateless Container & Auth:** Authentication uses stateless JWT `httpOnly` cookies (`token`), and zero business state is stored on the ephemeral Cloud Run container filesystem. Replacing or restarting a container instance never loses database records.
+
+#### Human-Executed GCP Restart Verification Methods
+Choose one of the following GCP-native restart methods (do **not** substitute local Docker Compose for GCP `C-05` evidence):
+
+1. **Method A — Idle Scale-to-Zero Cold Start (Recommended):**
+   - Because Cloud Run is configured with `--min-instances=0`, wait for the active container instance to scale down to zero after the idle timeout (typically ~15 minutes of no requests; confirm `0` active instances in GCP Console -> **Cloud Run** -> `crustcraft` -> **Metrics** / **Revisions**).
+   - Send a new request to the live Public Service URL to wake a brand-new cold-started container instance.
+2. **Method B — New Revision Instance Restart:**
+   - Trigger a new Cloud Run revision deployment without code changes so Cloud Run provisions a fresh container instance and shifts 100% traffic to it.
+
+> [!NOTE]
+> **`S6` Local vs. GCP Evidence Rule:** `docker compose down && docker compose up -d` is for local reproducibility testing (`C-03`) only and **MUST NOT** be substituted for GCP `C-05` persistence evidence.
+
+#### Post-Restart Verification
+1. On the live Public Service URL (`https://crustcraft-d7wyiqxska-as.a.run.app`), perform a hard refresh (`Ctrl+F5`) and open **"My Orders"** (`/orders`).
+2. Confirm that the exact **Order ID**, line items, total amount, pickup note, status, and timestamp recorded in `AC-LAB5-08-01` remain **100% intact**.
+3. Capture **Screenshot 2 ("After Restart" Evidence)** with the live URL visible in the browser address bar.
+
+---
+
+### 11.3 `AC-LAB5-08-03`: Fast Manual Rollback Execution via `workflow_dispatch` (Recommended Practice, Handout §5 & Guide Ep. 8.1)
+
+Follow this exact protocol to roll back the Cloud Run container image from **Release B** to **Release A** without re-running CI, rebuilding Docker images, or rolling back the database:
+
+1. **Identify Release A Target SHA & Digest:**
+   - Locate the **40-character Commit SHA** of **Release A** (`e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`) from the earlier `Deploy demo` GitHub Actions Summary (`Commit SHA` / `Commit image tag`) and note its corresponding `@sha256:...` digest (`sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`) in Artifact Registry.
+2. **Trigger Manual Rollback in GitHub Actions:**
+   - Navigate to **GitHub** -> **Actions** -> **Deploy demo** -> **Run workflow**.
+   - Select **Branch:** `main`.
+   - Enter **`image_tag`:** `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` (40-character Commit SHA of Release A).
+   - Click **Run workflow**.
+3. **Verify Internal Pipeline Mechanics (`.github/workflows/deploy.yml` & `deploy/release.sh`):**
+   - **Job `test` (`ci-docker.yml`):** **Skipped** because `inputs.image_tag` is non-empty.
+   - **Step `Build and push image`:** **Skipped** because `ROLLBACK == 'true'`.
+   - **Step `Verify image, migrate and deploy` (`bash deploy/release.sh`):**
+     - Validates that `IMAGE_TAG` matches the 40-character hexadecimal SHA regex (`^[0-9a-f]{40}$`).
+     - Resolves `asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft:e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` to its immutable `@sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` digest via `gcloud artifacts docker images describe`.
+     - **Skips `crustcraft-migrate`** (`ROLLBACK=true`), leaving the PostgreSQL 16 schema and all live data untouched.
+     - Updates Cloud Run service `crustcraft` to Release A's immutable `@sha256:...` image digest (`gcloud run services update`) and immediately runs `gcloud run services update-traffic --to-latest` to route 100% traffic to the latest revision (relying on Cloud Run's container startup health check).
+   - **Step `Smoke test public URL` (`python3 deploy/smoke_test.py "$SERVICE_URL"`):** Executes **post-switch** against the live public URL and verifies HTTP `200` on `/api/health`, `/api/ready`, and auth flows.
+     - *Traffic-Routing Qualification (`S6`):* Because `deploy/release.sh` shifts 100% of traffic **before** `smoke_test.py` runs, the smoke test verifies the rollback post-switch rather than gating traffic beforehand. Risk is minimal because Release A is an immutable, previously validated image digest; however, if pre-traffic validation or gradual canary shifting is required in future incidents, deploy manually with `--no-traffic`, verify the tagged revision URL (`--tag`), and then shift 100% traffic via `gcloud run services update-traffic`.
+   - **Step `Record deployment summary`:** Outputs `Rollback Mode: true`, the 40-character Commit SHA of Release A, and the resolved `@sha256:...` digest to `$GITHUB_STEP_SUMMARY`.
+4. **Capture Workflow Evidence:**
+   - **Screenshot 3:** GitHub Actions Rollback Run showing `test` and `Build` skipped, and `deploy` + `smoke_test` passed.
+   - **Screenshot 5:** GitHub Step Summary showing `Rollback Mode: true`, Release A's 40-char Commit SHA, and the matching `@sha256:...` image digest.
+
+---
+
+### 11.4 `AC-LAB5-08-04`: Verification of Persistence across Redeploy / Rollback (`C-05` Part B, `R-04`, `S6` & Guide Ep. 8.2)
+
+After the rollback workflow completes:
+
+1. **Verify Active Cloud Run Revision:**
+   - In GCP Console -> **Cloud Run** -> service `crustcraft` -> **Revisions**, confirm the newest active revision serves **100% traffic** and its container image points to **Release A's `@sha256:...` digest**.
+2. **Verify UI Rollback & Data Preservation:**
+   - Perform a hard refresh (`Ctrl+F5`) on `https://crustcraft-d7wyiqxska-as.a.run.app`.
+   - Confirm the frontend UI has reverted to **Release A** (the visible UI banner change introduced in Release B is no longer displayed).
+   - Confirm the signed-in customer session remains valid and the **Order ID** created in `AC-LAB5-08-01` (while running Release B) is **100% present and unaltered** in **"My Orders"** (`/orders`).
+3. **Capture Screenshot 4 ("After Redeploy/Rollback" Evidence):**
+   - Show the live Public Service URL, the reverted Release A UI, and the preserved Order record in **"My Orders"**.
+
+---
+
+### 11.5 `AC-LAB5-08-05`: Roll-Forward Recovery to Release B (Guide Ep. 8.3)
+
+Once `C-05` and Rollback evidence are captured, restore the latest production release (**Release B**) so the live system is ready for instructor grading and Lab 6 partner UAT:
+
+1. **Trigger Roll-Forward in GitHub Actions:**
+   - Navigate to **GitHub** -> **Actions** -> **Deploy demo** -> **Run workflow**.
+   - Select **Branch:** `main`.
+   - Either enter **`image_tag`:** `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` (fast roll-forward reusing the already-validated Release B image digest) **OR** leave `image_tag` empty to run full CI, build, and deploy current `main`.
+2. **Wait for Pipeline Completion:**
+   - Confirm the `Deploy demo` workflow and `python3 deploy/smoke_test.py "$SERVICE_URL"` pass.
+3. **Verify Restored Production State:**
+   - Hard-refresh (`Ctrl+F5`) `https://crustcraft-d7wyiqxska-as.a.run.app` and verify:
+     - The visible UI banner change from **Release B** (`CrustCraft Bakery (Release B)`) is restored.
+     - Cloud Run's latest ready revision serves **100% traffic** on **Release B's `@sha256:...` digest**.
+     - Both the Episode 8 Order created in `AC-LAB5-08-01` and the Episode 5 baseline Order (`#cmwf1j83j0002jyk1mtqxtpus`) remain completely intact in **"My Orders"** and the **Operator Queue** (`/operator/queue`).
+
+---
+
+### 11.6 `AC-LAB5-08-06`: Episode 8 Tracking Table, 5-Screenshot Evidence Checklist & Availability Compliance
+
+#### Episode 8 Persistence & Rollback Tracking Table
+
+| Phase / Step | Action Performed | Target Commit SHA (40 chars) | Image Digest (`@sha256:...`) | Active Cloud Run Revision | Test Order ID & Status | Verification Result |
+|---|---|---|---|---|---|---|
+| **1. Baseline (Release B)** | Live order created on Release B (`AC-LAB5-08-01`) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `sha256:<DIGEST_B>` | `crustcraft-00003-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
+| **2. Restart (`C-05` Part A)** | Scale-to-zero cold start / new revision restart (`AC-LAB5-08-02`) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `sha256:<DIGEST_B>` | `crustcraft-00003-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
+| **3. Rollback to Release A** | `workflow_dispatch` with `image_tag=<SHA_A>` (`AC-LAB5-08-03`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
+| **4. Post-Rollback (`C-05` Part B)** | Hard refresh live URL; verify Release A UI & Order preserved (`AC-LAB5-08-04`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
+| **5. Roll-Forward to Release B** | `workflow_dispatch` with `image_tag=<SHA_B>` or empty (`AC-LAB5-08-05`) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `sha256:<DIGEST_B>` | `crustcraft-00005-...` | `<ORDER_ID_EP8>` & `#cmwf1j83j0002jyk1mtqxtpus` | `PENDING_HUMAN_RUN` |
+
+#### 5-Screenshot Evidence Checklist (Handout Part 3 `C-05` & Part 4 `C-06` / Rollback)
+
+Use the Handout §12 caption format `"Figure X. C-05 (R-04): <what it shows>. Commit/Run/URL."` when assembling the final PDF report:
+
+- [ ] **Screenshot 1 (`Before` Baseline — `AC-LAB5-08-01`):** Browser showing **"My Orders"** (`/orders`) on `https://crustcraft-d7wyiqxska-as.a.run.app` with the newly created Episode 8 Order ID, items, total, status, and timestamp visible (passwords/secrets redacted).
+  - *Caption Template:* `Figure X. C-05 (R-04): Live production order <ORDER_ID_EP8> created on Release B before restart and rollback. Commit 13932e9, https://crustcraft-d7wyiqxska-as.a.run.app.`
+- [ ] **Screenshot 2 (`After Restart` — `AC-LAB5-08-02`):** Browser showing **"My Orders"** on the live URL after Cloud Run scale-to-zero cold start or new revision restart, confirming `<ORDER_ID_EP8>` is 100% intact.
+  - *Caption Template:* `Figure X. C-05 (R-04): Order <ORDER_ID_EP8> persisted in Cloud SQL after Cloud Run container restart. Revision <REV>, https://crustcraft-d7wyiqxska-as.a.run.app.`
+- [ ] **Screenshot 3 (GitHub Actions Rollback Run — `AC-LAB5-08-03`):** GitHub Actions `Deploy demo` workflow run graph showing `test` and `Build and push image` **Skipped**, and `Verify image, migrate and deploy` + `Smoke test public URL` **Passed**.
+  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): Manual workflow_dispatch rollback to Release A skipping CI/build/migration with smoke test passing. Run #<RUN_ID>, Commit e28ceff.`
+- [ ] **Screenshot 4 (`After Redeploy/Rollback` — `AC-LAB5-08-04`):** Browser showing the live URL reverted to **Release A** UI with `<ORDER_ID_EP8>` still preserved in **"My Orders"**.
+  - *Caption Template:* `Figure X. C-05 (R-04): Order <ORDER_ID_EP8> preserved in Cloud SQL after Cloud Run rollback to Release A. Revision <REV>, Commit e28ceff, https://crustcraft-d7wyiqxska-as.a.run.app.`
+- [ ] **Screenshot 5 (GitHub Step Summary — `AC-LAB5-08-03`):** `Deploy demo` `$GITHUB_STEP_SUMMARY` showing `Rollback Mode: true`, Release A's 40-char Commit SHA (`e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`), and the resolved `@sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` digest matching Cloud Run's active revision.
+  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): GitHub Actions Step Summary confirming Rollback Mode: true and immutable digest match for Release A. Run #<RUN_ID>, Digest sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5.`
+
+> [!CAUTION]
+> **Continuous Availability Policy Reminder (`B1`, Handout §3 & §12):**
+> **Cloud Run (`crustcraft`) and Cloud SQL (`crustcraft-pg`) must remain running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing or running teardown during this period is strictly prohibited.**
