@@ -37,7 +37,7 @@ const TopNavbar: React.FC = () => {
           to={user?.role === 'OPERATOR' ? '/operator/orders' : '/catalog'}
           className="text-lg font-bold text-amber-800 tracking-tight"
         >
-          CrustCraft Bakery
+          CrustCraft Bakery (Release B)
         </Link>
 
         {user ? (
