@@ -332,13 +332,13 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`AC-LAB5-01-02` / Handout §5** | Fiscal Guardrail | GCP Billing (`Budgets & caps`) | `crustcraft-lab5-budget` | $250 alerts-only; 4 thresholds (10/20/50/90%); monitoring email channel linked |
 | **`AC-LAB5-01-03` / Handout §4.4** | IAM Least Privilege | GCP IAM Console & Cloud Shell | `cpe334-bobcat` | Owner + Editor assigned; `billingEnabled=True` |
 | **`AC-LAB5-01-04` / `R-12`, `R-10`** | Repository Hygiene | GitHub Repo Settings & Issues | `meebotsompurin-stack/crustcraft-bakery-order` | Public repo; secret scanning push protection enabled; `lab5` labels active |
-| **`C-01` (`R-05`)** | CI & Quality Gate | PR #X & Actions CI Run | Commit `TBD` | CI passing with comprehensive test summary |
-| **`C-02` (`R-06`)** | Quality Gate | Failing PR from `test/prove-gate` | Commit `TBD` | `test-and-docker` failed; merge blocked |
+| **`C-01` (`R-05`)** | CI & Quality Gate | PR #30 & Actions CI Run | PR #30 (`a518c83`) | CI passing (`test-and-docker`) with comprehensive test summary |
+| **`C-02` (`R-06`)** | Quality Gate | Failing PR from `test/prove-gate` (PR #44) | PR #44 (`ad2e112`) | `test-and-docker` failed; merge blocked by `protect-main` |
 | **`C-03` (`R-01`, `R-02`)| Docker Reproducibility | Local / Cloud Shell execution | Commit `TBD` | Fresh clone builds & runs from `.env.example` |
 | **`C-04` (`R-03`)** | GCP Deployment | Live Cloud Run Public URL | Revision `crustcraft-00001-7kz` | `https://crustcraft-d7wyiqxska-as.a.run.app`; Auth, pre-order, catalog, operator queue verified live |
 | **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test (Ep. 5 & Ep. 8 §11) | `cpe334-bobcat:crustcraft-pg` | Ep. 5 Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL (stock 50->47); Ep. 8 Restart (`C-05` Part A) & Rollback/Redeploy (`C-05` Part B) runbook & tracking table in §11 |
-| **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`<br>Digest: `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`<br>Revision: `crustcraft-00002-...` | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
-| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-00003-...` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
+| **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`<br>Digest: `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`<br>Revision: `crustcraft-00002-424` (Run `43853803871`) | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
+| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `13932e96a1491ded7b7c1e4bfa03701b50b1e917`<br>Digest: `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c`<br>Revision: `crustcraft-00003-ncv` (Run `44042906620`) | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
 | **`LAB5-ISSUE-08` (Handout §5)** | Recommended Practice (Rollback) | `Deploy demo` `workflow_dispatch` & `deploy/release.sh` | `ROLLBACK=true` (`@sha256:...`) | Fast manual container image rollback (no-rebuild traffic switch) & roll-forward protocol documented in §11 |
 | **`AC-LAB5-07-01` / `R-07`** | CD Pipeline Trigger & Concurrency | `.github/workflows/deploy.yml` | `push` on `main` + `workflow_dispatch`, group `deploy-demo` | Concurrency group with `cancel-in-progress: false` to safeguard active DB migrations |
 | **`AC-LAB5-07-02` / `R-07`** | Two-Job Pipeline Architecture | `.github/workflows/deploy.yml` | Job 1: `test` (`ci-docker.yml`), Job 2: `deploy` | Quality Gate enforced; deployment blocked if test suite fails |
@@ -348,7 +348,7 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`AC-LAB5-06-02` / `M6`, `R-03`** | Keyless WIF Auth | GCP WIF Console (`github-actions` / `github-main`) | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/providers/github-main` | `TBD` — OIDC provider + CEL condition + `workloadIdentityUser` binding verified |
 | **`AC-LAB5-06-03` / `R-02`** | GitHub Environment | GitHub Settings > Environments > `demo` | `demo` (`main` branch only) | `TBD` — 4 plain variables (`GCP_PROJECT_ID`, `GCP_REGION`, `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`) configured |
 | **`AC-LAB5-06-04` / `M7`, `R-06`, `R-09`, `R-12`** | Merge Gate Governance | GitHub Settings > Rulesets > `protect-main` | Target: `main` (Active, No bypass) | `TBD` — 1 approval (no self-approval), required check `test-and-docker`, up-to-date branch, no force-push/deletion |
-| **`AC-LAB5-06-05` / `C-02` (`R-06`)** | Merge Gate Proof | Temporary PR from `test/prove-gate` -> `main` | PR #`TBD`, Commit `TBD` | `TBD` — `test-and-docker` failed (red); merge blocked; screenshot captured before closing PR & deleting branch |
+| **`AC-LAB5-06-05` / `C-02` (`R-06`)** | Merge Gate Proof | Temporary PR #44 from `test/prove-gate` -> `main` | PR #44, Commit `ad2e112` | **VERIFIED PASS** — `test-and-docker` failed (red); merge blocked; screenshot captured before closing PR & deleting branch |
 
 ---
 
@@ -652,8 +652,8 @@ To satisfy the rubric requirement for **Category 4: Repeatable Release Pipeline 
 
 | Release Cycle | Branching & PR Route | Full Commit SHA (40 chars) | Immutable Image Digest (`@sha256:...`) | Active Cloud Run Revision | Live URL & Verification Status |
 |---|---|---|---|---|---|
-| **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00002-...` | **DEPLOYED & VERIFIED**<br>Initial automated deployment via CD pipeline; automated smoke test PASSED |
-| **Release B** | `feat/release-b-banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `[sha256:Digest B — TBD upon build]` | `crustcraft-00003-...` | **DEPLOYED & VERIFIED**<br>UI banner update ("CrustCraft Bakery (Release B)"); automated smoke test; live browser visual verification |
+| **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00002-424` (Run `43853803871`) | **DEPLOYED & VERIFIED**<br>Initial automated deployment via CD pipeline; automated smoke test PASSED |
+| **Release B** | `feat/release-b-banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00003-ncv` (Run `44042906620`) | **DEPLOYED & VERIFIED**<br>UI banner update ("CrustCraft Bakery (Release B)"); automated smoke test; live browser visual verification |
 
 ### 10.4 Running Commit Lookup Procedure (`R-08`)
 
@@ -776,7 +776,7 @@ Once `C-05` and Rollback evidence are captured, restore the latest production re
 1. **Trigger Roll-Forward in GitHub Actions:**
    - Navigate to **GitHub** -> **Actions** -> **Deploy demo** -> **Run workflow**.
    - Select **Branch:** `main`.
-   - Either enter **`image_tag`:** `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` (fast roll-forward reusing the already-validated Release B image digest) **OR** leave `image_tag` empty to run full CI, build, and deploy current `main`.
+   - Either enter **`image_tag`:** `13932e96a1491ded7b7c1e4bfa03701b50b1e917` (fast roll-forward reusing the already-validated Release B image digest) **OR** leave `image_tag` empty to run full CI, build, and deploy current `main`.
 2. **Wait for Pipeline Completion:**
    - Confirm the `Deploy demo` workflow and `python3 deploy/smoke_test.py "$SERVICE_URL"` pass.
 3. **Verify Restored Production State:**
@@ -793,26 +793,26 @@ Once `C-05` and Rollback evidence are captured, restore the latest production re
 
 | Phase / Step | Action Performed | Target Commit SHA (40 chars) | Image Digest (`@sha256:...`) | Active Cloud Run Revision | Test Order ID & Status | Verification Result |
 |---|---|---|---|---|---|---|
-| **1. Baseline (Release B)** | Live order created on Release B (`AC-LAB5-08-01`) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `sha256:<DIGEST_B>` | `crustcraft-00003-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
-| **2. Restart (`C-05` Part A)** | Scale-to-zero cold start / new revision restart (`AC-LAB5-08-02`) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `sha256:<DIGEST_B>` | `crustcraft-00003-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
-| **3. Rollback to Release A** | `workflow_dispatch` with `image_tag=<SHA_A>` (`AC-LAB5-08-03`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
-| **4. Post-Rollback (`C-05` Part B)** | Hard refresh live URL; verify Release A UI & Order preserved (`AC-LAB5-08-04`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-...` | `<ORDER_ID_EP8>` (`PENDING`) | `PENDING_HUMAN_RUN` |
-| **5. Roll-Forward to Release B** | `workflow_dispatch` with `image_tag=<SHA_B>` or empty (`AC-LAB5-08-05`) | `13932e963d4f01c8b3f4df1c4ca3bc6e639ab48b` | `sha256:<DIGEST_B>` | `crustcraft-00005-...` | `<ORDER_ID_EP8>` & `#cmwf1j83j0002jyk1mtqxtpus` | `PENDING_HUMAN_RUN` |
+| **1. Baseline (Release B)** | Live order created on Release B (`AC-LAB5-08-01`) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00003-ncv` (Run `44042906620`) | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **2. Restart (`C-05` Part A)** | Scale-to-zero cold start / new revision restart (`AC-LAB5-08-02`) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00003-ncv` | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **3. Rollback to Release A** | `workflow_dispatch` with `image_tag=e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` (`AC-LAB5-08-03`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-6wg` (Run `44101835981`) | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **4. Post-Rollback (`C-05` Part B)** | Hard refresh live URL; verify Release A UI & Order preserved (`AC-LAB5-08-04`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-6wg` | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **5. Roll-Forward to Release B** | `workflow_dispatch` with `image_tag=13932e96a1491ded7b7c1e4bfa03701b50b1e917` or empty (`AC-LAB5-08-05`) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00005-lzs` (Run `44107156025`, 100% traffic) | `#cmwkpyktf000212bvzqayviz4` & `#cmwf1j83j0002jyk1mtqxtpus` | `VERIFIED PASS` |
 
 #### 5-Screenshot Evidence Checklist (Handout Part 3 `C-05` & Part 4 `C-06` / Rollback)
 
 Use the Handout §12 caption format `"Figure X. C-05 (R-04): <what it shows>. Commit/Run/URL."` when assembling the final PDF report:
 
 - [ ] **Screenshot 1 (`Before` Baseline — `AC-LAB5-08-01`):** Browser showing **"My Orders"** (`/orders`) on `https://crustcraft-d7wyiqxska-as.a.run.app` with the newly created Episode 8 Order ID, items, total, status, and timestamp visible (passwords/secrets redacted).
-  - *Caption Template:* `Figure X. C-05 (R-04): Live production order <ORDER_ID_EP8> created on Release B before restart and rollback. Commit 13932e9, https://crustcraft-d7wyiqxska-as.a.run.app.`
-- [ ] **Screenshot 2 (`After Restart` — `AC-LAB5-08-02`):** Browser showing **"My Orders"** on the live URL after Cloud Run scale-to-zero cold start or new revision restart, confirming `<ORDER_ID_EP8>` is 100% intact.
-  - *Caption Template:* `Figure X. C-05 (R-04): Order <ORDER_ID_EP8> persisted in Cloud SQL after Cloud Run container restart. Revision <REV>, https://crustcraft-d7wyiqxska-as.a.run.app.`
+  - *Caption Template:* `Figure X. C-05 (R-04): Live production order #cmwkpyktf000212bvzqayviz4 created on Release B before restart and rollback. Commit 13932e9, https://crustcraft-d7wyiqxska-as.a.run.app.`
+- [ ] **Screenshot 2 (`After Restart` — `AC-LAB5-08-02`):** Browser showing **"My Orders"** on the live URL after Cloud Run scale-to-zero cold start or new revision restart, confirming `#cmwkpyktf000212bvzqayviz4` is 100% intact.
+  - *Caption Template:* `Figure X. C-05 (R-04): Order #cmwkpyktf000212bvzqayviz4 persisted in Cloud SQL after Cloud Run container restart. Revision crustcraft-00003-ncv, https://crustcraft-d7wyiqxska-as.a.run.app.`
 - [ ] **Screenshot 3 (GitHub Actions Rollback Run — `AC-LAB5-08-03`):** GitHub Actions `Deploy demo` workflow run graph showing `test` and `Build and push image` **Skipped**, and `Verify image, migrate and deploy` + `Smoke test public URL` **Passed**.
-  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): Manual workflow_dispatch rollback to Release A skipping CI/build/migration with smoke test passing. Run #<RUN_ID>, Commit e28ceff.`
-- [ ] **Screenshot 4 (`After Redeploy/Rollback` — `AC-LAB5-08-04`):** Browser showing the live URL reverted to **Release A** UI with `<ORDER_ID_EP8>` still preserved in **"My Orders"**.
-  - *Caption Template:* `Figure X. C-05 (R-04): Order <ORDER_ID_EP8> preserved in Cloud SQL after Cloud Run rollback to Release A. Revision <REV>, Commit e28ceff, https://crustcraft-d7wyiqxska-as.a.run.app.`
+  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): Manual workflow_dispatch rollback to Release A skipping CI/build/migration with smoke test passing. Run #44101835981, Commit e28ceff.`
+- [ ] **Screenshot 4 (`After Redeploy/Rollback` — `AC-LAB5-08-04`):** Browser showing the live URL reverted to **Release A** UI with `#cmwkpyktf000212bvzqayviz4` still preserved in **"My Orders"**.
+  - *Caption Template:* `Figure X. C-05 (R-04): Order #cmwkpyktf000212bvzqayviz4 preserved in Cloud SQL after Cloud Run rollback to Release A. Revision crustcraft-00004-6wg, Commit e28ceff, https://crustcraft-d7wyiqxska-as.a.run.app.`
 - [ ] **Screenshot 5 (GitHub Step Summary — `AC-LAB5-08-03`):** `Deploy demo` `$GITHUB_STEP_SUMMARY` showing `Rollback Mode: true`, Release A's 40-char Commit SHA (`e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`), and the resolved `@sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` digest matching Cloud Run's active revision.
-  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): GitHub Actions Step Summary confirming Rollback Mode: true and immutable digest match for Release A. Run #<RUN_ID>, Digest sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5.`
+  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): GitHub Actions Step Summary confirming Rollback Mode: true and immutable digest match for Release A. Run #44101835981, Digest sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5.`
 
 > [!CAUTION]
 > **Continuous Availability Policy Reminder (`B1`, Handout §3 & §12):**
