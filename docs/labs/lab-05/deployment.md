@@ -1,6 +1,6 @@
 # CrustCraft Artisan Bakery — Deployment & Cloud Infrastructure Specification
 ## Lab 5: Cloud Deployment and CI/CD Pipeline on Google Cloud Platform (GCP)
-### Document Version: 1.6.0-issue07 (Episode 7 Automated CD Pipeline & Live Release)
+### Document Version: 1.8.0-issue09 (Handout §4.3 Complete Deployment Reference & Lab 5 Verification)
 
 ---
 
@@ -24,6 +24,23 @@
 | **Cloud Run Migration Job Name** | `crustcraft-migrate` |
 | **Cloud SQL Instance Name** | `crustcraft-pg` (PostgreSQL 16, Enterprise Edition, `db-f1-micro`) |
 | **Public Service URL** | `https://crustcraft-d7wyiqxska-as.a.run.app` (`https://crustcraft-<PROJECT_NUMBER>.asia-southeast1.run.app`) |
+
+### 1.2 GCP Project & Resource Inventory (Handout §4.3)
+
+| Resource Category | Exact GCP Resource Name / Identifier | Region / Location | Configuration & Notes |
+|---|---|---|---|
+| **GCP Project ID** | `cpe334-bobcat` | Global | Project Number: `<PROJECT_NUMBER>` (Redacted per `S7`) |
+| **GCP Target Region** | `asia-southeast1` | Singapore | Primary deployment region for all compute, database & registry resources |
+| **Cloud Run Service** | `crustcraft` | `asia-southeast1` | Single-container Express + React SPA; `--min-instances=0`, `--max-instances=3` |
+| **Cloud Run Migration Job** | `crustcraft-migrate` | `asia-southeast1` | Executes `npx prisma migrate deploy` (+ conditional seed) prior to traffic shift |
+| **Cloud SQL Instance** | `crustcraft-pg` | `asia-southeast1` | PostgreSQL 16 Enterprise Edition (`db-f1-micro`, 10GB SSD, auto-increase OFF); DB & User: `crustcraft` |
+| **Artifact Registry Repo** | `crustcraft` | `asia-southeast1` | Docker format: `asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft` |
+| **Workload Identity Pool** | `github-actions` | `global` | Keyless OIDC federation pool for GitHub Actions CD |
+| **WIF OIDC Provider** | `github-main` | `global` | Restricted via CEL condition to `main` branch & `demo` environment |
+| **Runtime Service Account** | `crustcraft-runner@cpe334-bobcat.iam.gserviceaccount.com` | Project-scoped | `roles/cloudsql.client` + per-secret `roles/secretmanager.secretAccessor` |
+| **Deployer Service Account** | `crustcraft-deployer@cpe334-bobcat.iam.gserviceaccount.com` | Project-scoped | `roles/run.developer`, `roles/artifactregistry.writer`, `roles/iam.serviceAccountUser` (on `crustcraft-runner`); zero JSON keys |
+| **Secret Manager Secrets** | `crustcraft-database-url`, `crustcraft-jwt-secret`, `crustcraft-admin-password`, `crustcraft-demo-password` | `asia-southeast1` / Global | Mounted as runtime environment variables via Cloud Run Secret bindings |
+| **Billing Budget** | `crustcraft-lab5-budget` | Billing Account | USD 250.00 alerts-only budget (10%, 20%, 50%, 90% thresholds) |
 
 ---
 
@@ -76,9 +93,20 @@ Access control follows the principle of least privilege (PoLP) across human engi
 
 ---
 
-## 3. Architecture & Stack Adaptation from Reference Kit
+## 3. Stack & Changes from Reference Kit (Handout §4.3)
 
-CrustCraft adapts the reference architecture (TokTickIT starter kit) while tailoring it to the bakery ordering domain model:
+CrustCraft adapts the reference architecture (TokTickIT starter kit) into a unified **Express + React TypeScript Monorepo**, migrates persistence from **SQLite to PostgreSQL 16**, and adopts a **Single Container Serving** deployment model tailored for Google Cloud Run:
+
+### 3.1 Key Architectural Changes from Reference
+1. **Express + React Monorepo (npm Workspaces):**
+   - Consolidated into a single repository using npm workspaces (`server/` for the Express + TypeScript REST API, `client/` for the React 18 + Vite + Tailwind CSS frontend, and root `prisma/` for shared schema and seeding).
+2. **Migration from SQLite to PostgreSQL 16:**
+   - Upgraded `prisma/schema.prisma` datasource provider from `sqlite` (`file:./dev.db`) to `postgresql` (PostgreSQL 16).
+   - Removed hardcoded fallback credentials and SQLite paths from `prisma/seed.ts`, requiring `ADMIN_PASSWORD` and `DEMO_USER_PASSWORD` via environment variables in production.
+   - Stored all monetary amounts as integer `satang` to prevent floating-point rounding discrepancies.
+3. **Single Container Serving (Express Static Hosting):**
+   - Instead of deploying separate Nginx (frontend) and Node.js (backend) containers, the unified multi-stage `Dockerfile` (`node:22-alpine`) compiles `client/dist` and `server/dist` into one non-root production image.
+   - When `NODE_ENV=production`, Express serves static SPA assets from `client/dist`, routes `/api/*` to REST endpoints, and forwards all other routes (`*`) to `index.html` for client-side React Router navigation. This eliminates CORS overhead and reduces Cloud Run memory footprint.
 
 ```
                                   [ GitHub Actions CI/CD ]
@@ -114,7 +142,7 @@ CrustCraft adapts the reference architecture (TokTickIT starter kit) while tailo
                                   Storage: 10GB SSD (Auto-increase: OFF)
 ```
 
-### 3.1 Stack Adaptation Matrix
+### 3.2 Stack Adaptation Matrix
 
 | Architectural Layer | TokTickIT Reference Kit | CrustCraft Production Architecture | Adaptation Rationale |
 |---|---|---|---|
@@ -125,7 +153,7 @@ CrustCraft adapts the reference architecture (TokTickIT starter kit) while tailo
 | **Containerization** | Multi-stage Dockerfile (Nginx + Node) | Multi-stage Dockerfile (Node.js 22 Alpine building client & server, runtime listening on dynamic `$PORT`) | Fully compliant with Cloud Run container runtime contract |
 | **CI/CD & Security** | GitHub Actions + WIF | GitHub Actions (`ci-docker.yml`, `deploy.yml`) + WIF (`github-actions` pool) | Zero long-lived JSON keys; OIDC token exchange gated to `main` branch and `demo` environment |
 
-### 3.2 Cloud-Ready Probes & Single-Container Static Serving (Episode 2)
+### 3.3 Cloud-Ready Probes & Dynamic Port Binding (Episode 2)
 
 To satisfy the Cloud Run container runtime contract and enable automated health/readiness monitoring:
 - **Liveness Probe (`GET /api/health`):** Returns HTTP `200 OK` with payload `{"status":"ok"}` indicating the Node.js Express process is responsive.
@@ -135,118 +163,123 @@ To satisfy the Cloud Run container runtime contract and enable automated health/
 
 ---
 
-## 4. Environment Variables Specification (Episode 2 Implementation)
+## 4. Environment Variable Table (Handout §4.3 & R-02)
 
-*This section documents every environment variable read by CrustCraft, fulfilling Handout `R-02`. Zero real secrets are committed into version control.*
+*This section documents every application and CI/CD environment variable used by CrustCraft. In compliance with `R-02` and `S6`, zero plaintext secrets are committed into version control (all sensitive values are represented using `<REDACTED>` or Secret Manager references).*
 
-| Environment Variable | Classification | Injection Mechanism | Purpose & Expected Value Format |
+### 4.1 Application Runtime & Build Variables
+
+| Variable Name | Purpose | Is Secret? | Source of Value |
 |---|---|---|---|
-| `NODE_ENV` | Plain Config | Cloud Run / Docker ENV / `.env` | Environment mode (`development` locally; `production` on Cloud Run to activate static client serving). |
-| `PORT` | Plain Config | Cloud Run Container Contract / `.env` | Port assigned dynamically by Cloud Run via `$PORT` (defaults to `3000`). Server listens on `0.0.0.0:$PORT`. |
-| `DATABASE_URL` | **Secret** | Secret Manager (`crustcraft-database-url`) / `.env` | PostgreSQL 16 connection string (Unix socket on Cloud Run: `postgresql://user:pass@localhost/crustcraft?host=/cloudsql/PROJECT:REGION:INSTANCE`; TCP locally). |
-| `JWT_SECRET` | **Secret** | Secret Manager (`crustcraft-jwt-secret`) / `.env` | High-entropy secret key for signing and verifying customer and operator authentication tokens. |
-| `ADMIN_PASSWORD` | **Secret** | Secret Manager (`crustcraft-admin-password`) | Initial password for the seeded Operator/Admin account (`admin@crustcraft.com`). |
-| `SEED_DEMO_DATA` | Plain Config | Cloud Run ENV | Boolean (`true`/`false`) toggling seed execution in migration job. |
-| `DEMO_USER_PASSWORD` | **Secret** | Secret Manager (`crustcraft-demo-password`) | Shared baseline password for customer demo accounts (shared privately for Lab 6 UAT). |
-| `CLIENT_ORIGIN` | Plain Config | Cloud Run ENV / `.env` | Allowed CORS origin for local development (`http://localhost:5173`). Optional in single-container production. |
-| `VITE_API_URL` | Plain Config | Client `.env` / Build ARG | API base URL for client Vite build (`http://localhost:3000` in local dev; empty string in production). |
+| `DATABASE_URL` | PostgreSQL 16 connection string used by Prisma ORM (`postgresql://<USER>:<REDACTED>@localhost/crustcraft?host=/cloudsql/cpe334-bobcat:asia-southeast1:crustcraft-pg` via Unix socket on Cloud Run; TCP locally). | **Yes** | **GCP Secret Manager** (`crustcraft-database-url`) in Production; local `.env` / `docker-compose.yml` locally |
+| `JWT_SECRET` | High-entropy cryptographic signing key for `httpOnly` JWT authentication cookies. | **Yes** | **GCP Secret Manager** (`crustcraft-jwt-secret`) in Production; local `.env` locally |
+| `PORT` | TCP port the Express server binds to (`0.0.0.0:$PORT`). Defaults to `3000`. | **No** | **Cloud Run Container Contract** (injected dynamically as `$PORT`); local `.env` |
+| `NODE_ENV` | Runtime mode (`development` locally; `production` on Cloud Run & Docker to enable static React SPA serving from `client/dist`). | **No** | **Cloud Run Service ENV** / `Dockerfile` / local `.env` |
+| `VITE_API_URL` | Base API URL embedded into the client Vite bundle (`http://localhost:3000` in local dev; empty string `""` for same-origin serving in single-container production). | **No** | **Client `.env`** / Vite build environment |
+| `ADMIN_PASSWORD` | Initial password for seeding the Operator/Admin account (`admin@crustcraft.com`). | **Yes** | **GCP Secret Manager** (`crustcraft-admin-password`) in Production; local `.env` locally |
+| `DEMO_USER_PASSWORD` | Baseline password for seeded demo customer accounts (distributed privately for Lab 6 UAT). | **Yes** | **GCP Secret Manager** (`crustcraft-demo-password`) in Production; local `.env` locally |
+| `SEED_DEMO_DATA` | Boolean flag (`true`/`false`) controlling whether `prisma/seed.ts` inserts demo catalog items and accounts. | **No** | **Cloud Run Job ENV** / `docker-compose.yml` / local `.env` |
+| `CLIENT_ORIGIN` | Allowed CORS origin during split local development (`http://localhost:5173`). Not needed in single-container production. | **No** | Local `.env` |
+
+### 4.2 GitHub Actions Environment Variables (`demo` Environment)
+
+| Variable Name | Purpose | Is Secret? | Source of Value |
+|---|---|---|---|
+| `GCP_PROJECT_ID` | Target GCP Project ID (`cpe334-bobcat`) passed to `deploy/release.sh` and `gcloud`. | **No** | **GitHub Environment Variables** (`Settings > Environments > demo`) |
+| `GCP_REGION` | Target GCP Region (`asia-southeast1`). | **No** | **GitHub Environment Variables** (`Settings > Environments > demo`) |
+| `WIF_PROVIDER` | Full Workload Identity Provider resource path (`projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/providers/github-main`). | **No** | **GitHub Environment Variables** (`Settings > Environments > demo`) |
+| `WIF_SERVICE_ACCOUNT` | Deployer Service Account email (`crustcraft-deployer@cpe334-bobcat.iam.gserviceaccount.com`). | **No** | **GitHub Environment Variables** (`Settings > Environments > demo`) |
 
 ---
 
-## 5. Local & CI Build, Test, and Containerization Commands
+## 5. Commands Guide: Build, Test, Run, Migrate & Seed (Handout §4.3)
 
-### 5.1 Local Development & Container Validation (`C-03`)
+All lifecycle commands are categorized across the three execution environments: **Local (Node)**, **Docker Compose (Container)**, and **Production (GCP)**.
+
+### 5.1 Environment Command Matrix
+
+| Operation | Local (Node.js) | Docker Compose (Container) | Production (GCP) |
+|---|---|---|---|
+| **Build** | `npm run build` | `docker compose build` | `docker build --tag "$IMAGE" .` (via `deploy.yml`) |
+| **Test** | `npm test` / `npm run test:e2e` | `curl -f http://localhost:3000/api/ready` | `python3 deploy/smoke_test.py "$SERVICE_URL"` |
+| **Run** | `npm run dev` (or `npm run start --workspace=server`) | `docker compose up --build -d` | `bash deploy/release.sh` (updates Cloud Run `crustcraft`) |
+| **Migrate** | `npm run db:migrate` | Auto-executed by `migrate` container (`npx prisma migrate deploy`) | `gcloud run jobs execute crustcraft-migrate --region=asia-southeast1 --project=cpe334-bobcat --wait` |
+| **Seed** | `npm run seed` | Auto-executed by `migrate` container (`npm run seed`) | Executed inside `crustcraft-migrate` job when `SEED_DEMO_DATA=true` |
+
+### 5.2 Local Development (Node.js)
 ```bash
-# Clean clone verification (R-01, R-02, C-03)
+# 1. Clean clone & environment setup (R-01, R-02)
 git clone https://github.com/meebotsompurin-stack/crustcraft-bakery-order.git
 cd crustcraft-bakery-order
 cp .env.example .env
 
-# Local development without Docker
+# 2. Install dependencies & generate Prisma client
 npm ci
+npx prisma generate
+
+# 3. Migrate & seed local PostgreSQL 16 database
+npm run db:migrate          # runs: prisma migrate dev --schema=prisma/schema.prisma
+npm run seed                # runs: npm run seed --workspace=server (tsx ../prisma/seed.ts)
+
+# 4. Run development servers (Express API on :3000 + Vite Client on :5173)
 npm run dev
 
-# Containerized execution via Docker Compose (Multi-stage build, Postgres 16, Auto-migration)
+# 5. Build production bundles & run automated test suites
+npm run build               # builds server (tsc) and client (tsc && vite build)
+npm test                    # runs Vitest unit & API integration tests in server/
+npm run test:e2e            # runs Playwright end-to-end tests
+```
+
+### 5.3 Docker Compose (Containerized Local Stack)
+```bash
+# 1. Build multi-stage image, start Postgres 16, run migration/seed job, and start app
 docker compose up --build -d
 
-# Inspect service statuses and logs
+# 2. Inspect running services and application logs
 docker compose ps -a
 docker compose logs -f app
 
-# Health & Readiness probe verification
+# 3. Verify liveness & readiness probes against containerized Express + React SPA
 curl -f http://localhost:3000/api/health
 curl -f http://localhost:3000/api/ready
 
-# Graceful teardown (with volume cleanup)
+# 4. Re-run database migration & seed container manually if needed
+docker compose run --rm migrate
+
+# 5. Graceful teardown (removes containers and local Postgres volume)
 docker compose down -v
 ```
 
 #### Docker Compose Service Topology:
-1. **`db` (`postgres:16-alpine`):** PostgreSQL database engine listening on container port `5432`. Includes persistent volume `postgres_data` and healthcheck via `pg_isready`.
-2. **`migrate` (`crustcraft-migrate`):** Ephemeral container built from root `Dockerfile`. Waits for `db` to be healthy (`condition: service_healthy`), executes `npx prisma migrate deploy && npm run seed`, then exits cleanly with code 0.
-3. **`app` (`crustcraft-app`):** Web container built from root `Dockerfile`. Waits for `migrate` to succeed (`condition: service_completed_successfully`), binds to `0.0.0.0:3000` mapped to host `3000:3000`, serves the compiled React Vite SPA and Express REST API as non-root `node` user.
+1. **`db` (`postgres:16-alpine`):** PostgreSQL database engine on container port `5432` with persistent volume `postgres_data` and `pg_isready` healthcheck.
+2. **`migrate` (`crustcraft-migrate`):** Ephemeral container built from root `Dockerfile`. Waits for `db` (`condition: service_healthy`), runs `npx prisma migrate deploy && npm run seed`, and exits with code `0`.
+3. **`app` (`crustcraft-app`):** Production web container built from root `Dockerfile`. Waits for `migrate` (`condition: service_completed_successfully`), listens on `0.0.0.0:3000` (mapped to host `3000:3000`), and serves both the compiled React SPA and Express API as non-root user `node`.
 
-### 5.2 Database Migration & Seeding Commands
+### 5.4 CI Validation & Production Deployment (GCP)
 ```bash
-# Apply pending Prisma migrations
-npx prisma migrate deploy --schema=prisma/schema.prisma
+# --- CI Offline Checks & Docker Build (.github/workflows/ci-docker.yml) ---
+bash -n deploy/deploy.sh deploy/teardown.sh deploy/release.sh
+bash deploy/tests/test_deploy_stub.sh
+bash deploy/tests/test_release_stub.sh
+python3 -m unittest discover -s deploy/tests -p 'test_smoke.py'
+docker build -t crustcraft-app:latest .
 
-# Execute idempotent database seed
-npx tsx prisma/seed.ts
-```
-
-### 5.3 CI Workflow Commands (`ci-docker.yml`)
-- **Triggers:** `workflow_call`, `pull_request` targeting `[main, lab-5-staging]`, and `workflow_dispatch`.
-- **Required Check Job ID:** `test-and-docker` (runs on `ubuntu-latest` with `contents: read` permissions).
-- **Service Container:** `postgres:16-alpine` with `pg_isready` healthcheck and ephemeral CI test credentials (`crustcraft` / `crustcraft_test_password` / `crustcraft_test`).
-- **Supply-Chain Security:** All third-party actions (`actions/checkout`, `actions/setup-node` on Node 22, `actions/setup-python` on Python 3.12) are pinned to full 40-character commit SHAs, with weekly `.github/dependabot.yml` updates for `npm` and `github-actions`.
-- **Offline Deployment Script Checks:**
-  ```bash
-  bash -n deploy/deploy.sh deploy/teardown.sh deploy/release.sh
-  bash deploy/tests/test_deploy_stub.sh
-  bash deploy/tests/test_release_stub.sh
-  python3 -m unittest discover -s deploy/tests -p 'test_smoke.py'
-  ```
-- **Application Build & Test:**
-  ```bash
-  # Backend tests against ephemeral CI Postgres
-  npm ci
-  npx prisma generate
-  npx prisma migrate deploy
-  npm run seed
-  npm test
-
-  # Frontend Vite build
-  cd client && npm ci && npm run build
-
-  # Unified production Docker build
-  docker build -t crustcraft-app:latest .
-  ```
-
-### 5.4 First GCP Deployment via Cloud Shell (`deploy/deploy.sh`)
-
-Follow this exact procedure on Google Cloud Shell to execute the one-time initial infrastructure provisioning and application deployment:
-
-```bash
-# 1. Ensure clean workspace on branch main (B4)
-git checkout main
-git pull origin main
-
-# 2. Pre-flight review & dry run preview (AC-LAB5-05-01, S6)
+# --- One-Time Initial GCP Provisioning (Cloud Shell, Episode 5) ---
 DRY_RUN=1 PROJECT_ID="cpe334-bobcat" bash deploy/deploy.sh
-
-# 3. Real deployment execution with demo data seeding (AC-LAB5-05-02, AC-LAB5-05-03, AC-LAB5-05-04)
 PROJECT_ID="cpe334-bobcat" bash deploy/deploy.sh --demo
 
-# 4. Capture live Cloud Run Service URL and verify endpoints (AC-LAB5-05-05, C-04)
-SERVICE_URL=$(gcloud run services describe crustcraft --region=asia-southeast1 --project="$PROJECT_ID" --format='value(status.url)')
-echo "Live Service URL: $SERVICE_URL"
+# --- Automated Production Release & Smoke Verification (GitHub Actions CD) ---
+# Executed automatically on merge to main via .github/workflows/deploy.yml:
+# 1. Build & Push to Artifact Registry (tagged with 40-char commit SHA)
+gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+docker build --tag "asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft:$IMAGE_TAG" .
+docker push "asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft:$IMAGE_TAG"
 
-# Verify HTTP 200 responses on health and readiness probes
-curl -f "$SERVICE_URL/api/health"
-curl -f "$SERVICE_URL/api/ready"
+# 2. Resolve immutable @sha256 digest, execute crustcraft-migrate job, and update Cloud Run service
+PROJECT_ID="cpe334-bobcat" REGION="asia-southeast1" IMAGE_TAG="$IMAGE_TAG" bash deploy/release.sh
 
-# 5. Run automated smoke test suite (AC-LAB5-05-05)
+# 3. Verify live production endpoints
+SERVICE_URL=$(gcloud run services describe crustcraft --region=asia-southeast1 --project="cpe334-bobcat" --format='value(status.url)')
 python3 deploy/smoke_test.py "$SERVICE_URL"
 ```
 
@@ -254,21 +287,23 @@ python3 deploy/smoke_test.py "$SERVICE_URL"
 > **Cloud SQL Migration Troubleshooting (`S6`):**
 > If the Cloud Run Migration Job (`crustcraft-migrate`) encounters an issue during execution, inspect the execution logs using Cloud Logging before retrying:
 > ```bash
-> gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=crustcraft-migrate" --project="$PROJECT_ID" --limit=50 --format="value(textPayload)"
+> gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=crustcraft-migrate" --project="cpe334-bobcat" --limit=50 --format="value(textPayload)"
 > ```
 
 ---
 
 ## 6. Repeatable Release & Rollback Procedure
 
-### 6.1 Release Flow (`R-07`, `C-06`)
-1. Developer opens PR from feature branch into `lab-5-staging`.
-2. Automated check `test-and-docker` runs on GitHub Actions and must pass.
-3. Teammate conducts peer review with specific findings and approves (`R-09`).
-4. PR is merged to `lab-5-staging`.
-5. Release PR opened from `lab-5-staging` into `main`.
-6. Merge to `main` triggers `.github/workflows/deploy.yml` via WIF.
-7. Image built, pushed to Artifact Registry tagged with `${{ github.sha }}`, migration job executed, Cloud Run updated to image digest, smoke test validates `/api/ready`.
+### 6.1 Automated CI/CD Release Flow (`R-07`, `C-06`)
+1. **Feature Integration:** Developer opens a PR from a feature branch into `lab-5-staging`. Automated check `test-and-docker` (`.github/workflows/ci-docker.yml`) must pass, followed by peer review approval (`R-09`), before merging into `lab-5-staging`.
+2. **Release PR to `main`:** A Release PR is opened from `lab-5-staging` into `main`, enforced by the `protect-main` ruleset (requiring passing `test-and-docker` and 1 non-author approval).
+3. **CD Pipeline Trigger (`.github/workflows/deploy.yml`):** Merging/pushing to `main` triggers the two-job `Deploy demo` workflow (`concurrency: deploy-demo`):
+   - **Job 1 (`test`):** Re-runs `ci-docker.yml` as a mandatory quality gate.
+   - **Job 2 (`deploy`):** Runs in GitHub Environment `demo`:
+     1. **WIF Authentication:** Authenticates keylessly via `google-github-actions/auth@v2` using OIDC token exchange.
+     2. **Docker Build & Push:** Builds the unified image and pushes it to Artifact Registry tagged with the 40-character `${{ github.sha }}`.
+     3. **Immutable Digest & Migration (`deploy/release.sh`):** Resolves the tag to its immutable `@sha256:...` digest, updates and executes Cloud Run Job `crustcraft-migrate` (`--wait`), updates Cloud Run service `crustcraft` to the digest, and shifts 100% traffic (`--to-latest`).
+     4. **Smoke Test & Summary:** Runs `python3 deploy/smoke_test.py "$SERVICE_URL"` and writes the Commit SHA, Image Digest, and Service URL to `$GITHUB_STEP_SUMMARY`.
 
 ### 6.2 Rollback Flow (`R-08`, Recommended Practice Handout §5)
 1. Navigate to GitHub Actions > **Deploy demo** workflow.
@@ -283,7 +318,7 @@ To determine and verify the exact commit SHA currently serving live traffic on C
    ```bash
    gcloud run services describe crustcraft \
      --region=asia-southeast1 \
-     --project="<PROJECT_ID>" \
+     --project="cpe334-bobcat" \
      --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
    ```
 
@@ -297,22 +332,23 @@ To determine and verify the exact commit SHA currently serving live traffic on C
 | **`AC-LAB5-01-02` / Handout §5** | Fiscal Guardrail | GCP Billing (`Budgets & caps`) | `crustcraft-lab5-budget` | $250 alerts-only; 4 thresholds (10/20/50/90%); monitoring email channel linked |
 | **`AC-LAB5-01-03` / Handout §4.4** | IAM Least Privilege | GCP IAM Console & Cloud Shell | `cpe334-bobcat` | Owner + Editor assigned; `billingEnabled=True` |
 | **`AC-LAB5-01-04` / `R-12`, `R-10`** | Repository Hygiene | GitHub Repo Settings & Issues | `meebotsompurin-stack/crustcraft-bakery-order` | Public repo; secret scanning push protection enabled; `lab5` labels active |
-| **`C-01` (`R-05`)** | CI & Quality Gate | PR #X & Actions CI Run | Commit `TBD` | CI passing with comprehensive test summary |
-| **`C-02` (`R-06`)** | Quality Gate | Failing PR from `test/prove-gate` | Commit `TBD` | `test-and-docker` failed; merge blocked |
+| **`C-01` (`R-05`)** | CI & Quality Gate | PR #30 & Actions CI Run | PR #30 (`a518c83`) | CI passing (`test-and-docker`) with comprehensive test summary |
+| **`C-02` (`R-06`)** | Quality Gate | Failing PR from `test/prove-gate` (PR #44) | PR #44 (`ad2e112`) | `test-and-docker` failed; merge blocked by `protect-main` |
 | **`C-03` (`R-01`, `R-02`)| Docker Reproducibility | Local / Cloud Shell execution | Commit `TBD` | Fresh clone builds & runs from `.env.example` |
 | **`C-04` (`R-03`)** | GCP Deployment | Live Cloud Run Public URL | Revision `crustcraft-00001-7kz` | `https://crustcraft-d7wyiqxska-as.a.run.app`; Auth, pre-order, catalog, operator queue verified live |
-| **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test | `cpe334-bobcat:crustcraft-pg` | Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL; stock updated 50->47 |
-| **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`<br>Digest: `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`<br>Revision: `crustcraft-00002-...` | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
-| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `[Commit SHA B — TBD]`<br>Digest: `[Image Digest B — TBD]`<br>Revision: `crustcraft-00003-...` | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
+| **`C-05` (`R-04`)** | Persistence | Cloud SQL live data test (Ep. 5 & Ep. 8 §11) | `cpe334-bobcat:crustcraft-pg` | Ep. 5 Order `#cmwf1j83j0002jyk1mtqxtpus` persisted in live Cloud SQL (stock 50->47); Ep. 8 Restart (`C-05` Part A) & Rollback/Redeploy (`C-05` Part B) runbook & tracking table in §11 |
+| **`C-06 (Release A)` / `R-07`–`R-10`** | Repeatable Release A | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`<br>Digest: `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`<br>Revision: `crustcraft-00002-424` (Run `43853803871`) | Pipeline auto-deployed upon initial merge from `lab-5-staging` to `main`; smoke test PASSED |
+| **`C-06 (Release B)` / `R-07`–`R-10`** | Repeatable Release B | GitHub Actions `deploy-demo` run & Cloud Run Console | Commit: `13932e96a1491ded7b7c1e4bfa03701b50b1e917`<br>Digest: `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c`<br>Revision: `crustcraft-00003-ncv` (Run `44042906620`) | Pipeline auto-deployed UI update upon merge to `main`; smoke test PASSED; verified live in browser |
+| **`LAB5-ISSUE-08` (Handout §5)** | Recommended Practice (Rollback) | `Deploy demo` `workflow_dispatch` & `deploy/release.sh` | `ROLLBACK=true` (`@sha256:...`) | Fast manual container image rollback (no-rebuild traffic switch) & roll-forward protocol documented in §11 |
 | **`AC-LAB5-07-01` / `R-07`** | CD Pipeline Trigger & Concurrency | `.github/workflows/deploy.yml` | `push` on `main` + `workflow_dispatch`, group `deploy-demo` | Concurrency group with `cancel-in-progress: false` to safeguard active DB migrations |
 | **`AC-LAB5-07-02` / `R-07`** | Two-Job Pipeline Architecture | `.github/workflows/deploy.yml` | Job 1: `test` (`ci-docker.yml`), Job 2: `deploy` | Quality Gate enforced; deployment blocked if test suite fails |
 | **`AC-LAB5-07-03` / `R-08`, `C-06`** | Immutable Digest & Migration | `deploy/release.sh` | `@sha256:...` digest resolution & traffic migration | Resolves image tag to immutable digest; executes migration job; updates service and pushes 100% traffic |
 | **`AC-LAB5-07-04` / `M8`, `R-08`** | Deployment Identification | GitHub Actions Step Summary & Console | Commit SHA (40 chars) + Image Digest | Verified via `$GITHUB_STEP_SUMMARY` and `gcloud run services describe` |
-| **`AC-LAB5-06-01` / `R-02`, `R-03`** | Security / WIF IAM | GCP IAM Console (`crustcraft-deployer`) | `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` | `TBD` — Resource-level roles only (`run.developer`, `artifactregistry.writer`, `serviceAccountUser`); Keys tab empty |
+| **`AC-LAB5-06-01` / `R-02`, `R-03`** | Security / WIF IAM | GCP IAM Console (`crustcraft-deployer`) | `crustcraft-deployer@cpe334-bobcat.iam.gserviceaccount.com` | `TBD` — Resource-level roles only (`run.developer`, `artifactregistry.writer`, `serviceAccountUser`); Keys tab empty |
 | **`AC-LAB5-06-02` / `M6`, `R-03`** | Keyless WIF Auth | GCP WIF Console (`github-actions` / `github-main`) | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/providers/github-main` | `TBD` — OIDC provider + CEL condition + `workloadIdentityUser` binding verified |
 | **`AC-LAB5-06-03` / `R-02`** | GitHub Environment | GitHub Settings > Environments > `demo` | `demo` (`main` branch only) | `TBD` — 4 plain variables (`GCP_PROJECT_ID`, `GCP_REGION`, `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`) configured |
 | **`AC-LAB5-06-04` / `M7`, `R-06`, `R-09`, `R-12`** | Merge Gate Governance | GitHub Settings > Rulesets > `protect-main` | Target: `main` (Active, No bypass) | `TBD` — 1 approval (no self-approval), required check `test-and-docker`, up-to-date branch, no force-push/deletion |
-| **`AC-LAB5-06-05` / `C-02` (`R-06`)** | Merge Gate Proof | Temporary PR from `test/prove-gate` -> `main` | PR #`TBD`, Commit `TBD` | `TBD` — `test-and-docker` failed (red); merge blocked; screenshot captured before closing PR & deleting branch |
+| **`AC-LAB5-06-05` / `C-02` (`R-06`)** | Merge Gate Proof | Temporary PR #44 from `test/prove-gate` -> `main` | PR #44, Commit `ad2e112` | **VERIFIED PASS** — `test-and-docker` failed (red); merge blocked; screenshot captured before closing PR & deleting branch |
 
 ---
 
@@ -396,11 +432,11 @@ Real end-to-end business workflows were verified live on the production Cloud Ru
 ### 9.1 Deployer Service Account & Least Privilege (`AC-LAB5-06-01`)
 
 - **Required APIs:** Enable `iamcredentials.googleapis.com` and `sts.googleapis.com` on the target GCP project.
-- **Deployer Service Account:** `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com`
+- **Deployer Service Account:** `crustcraft-deployer@cpe334-bobcat.iam.gserviceaccount.com`
 - **Resource-Level Roles Only:**
   - `roles/run.developer` on Cloud Run service `crustcraft` and Cloud Run job `crustcraft-migrate` (region `asia-southeast1`).
   - `roles/artifactregistry.writer` on Artifact Registry repository `crustcraft` (`asia-southeast1`).
-  - `roles/iam.serviceAccountUser` on `crustcraft-runner@cpe334-crustcraft.iam.gserviceaccount.com` only.
+  - `roles/iam.serviceAccountUser` on `crustcraft-runner@cpe334-bobcat.iam.gserviceaccount.com` only.
 - **Explicit Restrictions:**
   - **No `roles/owner`, `roles/editor`, or project-wide roles** may be granted to `crustcraft-deployer`.
   - **Zero JSON Keys:** Authentication is keyless WIF OIDC only. The Service Account **Keys** tab must remain empty, and nobody may click **"Add key"** or download/export a JSON key file (`R-02`, Lab Sheet §4.3).
@@ -432,7 +468,7 @@ Real end-to-end business workflows were verified live on the production Cloud Ru
      assertion.workflow_ref.startsWith('meebotsompurin-stack/crustcraft-bakery-order/.github/workflows/deploy.yml@refs/heads/main') &&
      assertion.sub == 'repo:meebotsompurin-stack/crustcraft-bakery-order:environment:demo'
      ```
-   - **Workload Identity User Binding:** Bind `roles/iam.workloadIdentityUser` on `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` to:
+   - **Workload Identity User Binding:** Bind `roles/iam.workloadIdentityUser` on `crustcraft-deployer@cpe334-bobcat.iam.gserviceaccount.com` to:
      ```text
      principalSet://iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/attribute.repository_id/<YOUR_NUMERIC_REPO_ID>
      ```
@@ -440,7 +476,7 @@ Real end-to-end business workflows were verified live on the production Cloud Ru
 3. **Human-Run Cloud Shell Command Block (Placeholder Template):**
    *Review every line before running in Cloud Shell. Never commit real `<PROJECT_NUMBER>`, `<YOUR_NUMERIC_REPO_ID>`, or `<YOUR_NUMERIC_OWNER_ID>` values into documentation.*
    ```bash
-   PROJECT_ID="cpe334-crustcraft"
+   PROJECT_ID="cpe334-bobcat"
    PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
    REPO="meebotsompurin-stack/crustcraft-bakery-order"
 
@@ -515,10 +551,10 @@ Real end-to-end business workflows were verified live on the production Cloud Ru
 
 | Variable Name | Configured Value |
 |---|---|
-| `GCP_PROJECT_ID` | `cpe334-crustcraft` |
+| `GCP_PROJECT_ID` | `cpe334-bobcat` |
 | `GCP_REGION` | `asia-southeast1` |
 | `WIF_PROVIDER` | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/github-actions/providers/github-main` |
-| `WIF_SERVICE_ACCOUNT` | `crustcraft-deployer@cpe334-crustcraft.iam.gserviceaccount.com` |
+| `WIF_SERVICE_ACCOUNT` | `crustcraft-deployer@cpe334-bobcat.iam.gserviceaccount.com` |
 
 > [!WARNING]
 > Do **not** commit the real numeric `<PROJECT_NUMBER>` into this document or any repository file. Replace `<PROJECT_NUMBER>` only inside the GitHub Environment variable UI and Cloud Shell commands.
@@ -580,7 +616,7 @@ The deployment workflow (`.github/workflows/deploy.yml`) implements an automated
                 ▼
       ┌──────────────────┐
       │   Job 2: deploy  │ ───► Environment: demo
-      │ (CD Automation)  │      ├── Authenticate via WIF (google-github-actions/auth@v2.1.8)
+      │ (CD Automation)  │      ├── Authenticate via WIF (google-github-actions/auth@v2)
       └──────────────────┘      ├── Build & push image tagged with full 40-char ${{ github.sha }}
                                 ├── Execute deploy/release.sh (Resolves @sha256 digest)
                                 ├── Run Cloud Run migration job (crustcraft-migrate)
@@ -616,8 +652,8 @@ To satisfy the rubric requirement for **Category 4: Repeatable Release Pipeline 
 
 | Release Cycle | Branching & PR Route | Full Commit SHA (40 chars) | Immutable Image Digest (`@sha256:...`) | Active Cloud Run Revision | Live URL & Verification Status |
 |---|---|---|---|---|---|
-| **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00002-...` | **DEPLOYED & VERIFIED**<br>Initial automated deployment via CD pipeline; automated smoke test PASSED |
-| **Release B** | `feat/release-b-banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `[Commit SHA B — TBD upon merge]` | `[sha256:Digest B — TBD upon build]` | `crustcraft-00003-...` | **PENDING MERGE**<br>UI banner update ("CrustCraft Bakery (Release B)"); automated smoke test; live browser visual verification |
+| **Release A** | `lab-5-staging` $\rightarrow$ `main` (Release PR) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00002-424` (Run `43853803871`) | **DEPLOYED & VERIFIED**<br>Initial automated deployment via CD pipeline; automated smoke test PASSED |
+| **Release B** | `feat/release-b-banner` $\rightarrow$ `lab-5-staging` $\rightarrow$ `main` (Release PR) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00003-ncv` (Run `44042906620`) | **DEPLOYED & VERIFIED**<br>UI banner update ("CrustCraft Bakery (Release B)"); automated smoke test; live browser visual verification |
 
 ### 10.4 Running Commit Lookup Procedure (`R-08`)
 
@@ -628,7 +664,156 @@ Reviewers and auditors can verify the exact commit SHA currently serving live tr
    ```bash
    gcloud run services describe crustcraft \
      --region=asia-southeast1 \
-     --project="<PROJECT_ID>" \
+     --project="cpe334-bobcat" \
      --format='value(status.latestReadyRevisionName, spec.template.spec.containers[0].image)'
    ```
 
+
+---
+
+## 11. Episode 8: Database Persistence Verification across Restarts & Emergency Rollback (`LAB5-ISSUE-08`)
+
+*This section provides the human-executed verification runbook, rollback/roll-forward protocol, structured tracking table, and 5-screenshot evidence checklist for **Handout `C-05` (`R-04`)** and **Recommended Practice: Fast Manual Rollback (Handout §5, Guide Ep. 8)**.*
+
+> [!CAUTION]
+> **Security, AI Safety & Continuous Availability Guardrails (`R-02`, `S7`, `B1`):**
+> - **Zero Secret Leakage (`R-02`, `S7`):** NEVER include real passwords, `DATABASE_URL` connection strings, JWT secrets, or tokens in this document, Git commits, or screenshots. Redact or blur any sensitive data before capturing evidence screenshots.
+> - **No Autonomous Cloud/GitHub Mutations:** All `gcloud`, Cloud Run, Cloud SQL, and GitHub Actions `workflow_dispatch` operations below MUST be executed by human operators after reviewing parameters.
+> - **No Database Rollback:** Emergency rollback applies **ONLY** to the Cloud Run container image revision (`ROLLBACK=true` in `deploy/release.sh`), which skips `crustcraft-migrate` while keeping the additive PostgreSQL 16 schema and all persisted order data intact.
+> - **Continuous Availability Policy (`B1`):** **Keep Cloud Run (`crustcraft`) and Cloud SQL (`crustcraft-pg`) running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing or running teardown during this period is strictly prohibited.**
+
+---
+
+### 11.1 `AC-LAB5-08-01`: Live Production Order Creation on Release B ("Before" Baseline)
+
+Execute this procedure on the live Cloud Run Public Service URL running **Release B** to establish the "Before" persistence baseline:
+
+1. Open the live Public Service URL in a browser: `https://crustcraft-d7wyiqxska-as.a.run.app`
+2. Sign in using a `CUSTOMER` account (e.g., `customer1@test.com`). *(Reminder per `S7`: never expose or screenshot account passwords.)*
+3. Create a new bakery pre-order (for example, `Sourdough Bread` x `2` or `Artisan Butter Croissant`) with a distinct pickup note for Episode 8 persistence verification (e.g., `"Ep8 persistence check"`).
+4. Navigate to **"My Orders"** (`/orders`) and record the following baseline fields in the tracking table (§11.6):
+   - **Order ID** (e.g., `#...`)
+   - **Order Items & Quantities**
+   - **Total Amount** (THB / satang)
+   - **Order Status** (`PENDING`)
+   - **Created Timestamp**
+5. Capture **Screenshot 1 ("Before" Evidence)** showing the newly created order in **"My Orders"** with the public Cloud Run URL (`https://crustcraft-d7wyiqxska-as.a.run.app`) clearly visible in the browser address bar.
+
+---
+
+### 11.2 `AC-LAB5-08-02`: Verification of Persistence across Application Restart (`C-05` Part A, `R-04`, `S6`)
+
+#### Why CrustCraft Data Survives Container Restarts
+- **Externalized Persistent State:** All application state — users, bakery catalog stock, orders, and order items — is persisted in **Cloud SQL for PostgreSQL 16 (`crustcraft-pg`)** over a Unix socket connection (`/cloudsql/cpe334-bobcat:asia-southeast1:crustcraft-pg`).
+- **Stateless Container & Auth:** Authentication uses stateless JWT `httpOnly` cookies (`token`), and zero business state is stored on the ephemeral Cloud Run container filesystem. Replacing or restarting a container instance never loses database records.
+
+#### Human-Executed GCP Restart Verification Methods
+Choose one of the following GCP-native restart methods (do **not** substitute local Docker Compose for GCP `C-05` evidence):
+
+1. **Method A — Idle Scale-to-Zero Cold Start (Recommended):**
+   - Because Cloud Run is configured with `--min-instances=0`, wait for the active container instance to scale down to zero after the idle timeout (typically ~15 minutes of no requests; confirm `0` active instances in GCP Console -> **Cloud Run** -> `crustcraft` -> **Metrics** / **Revisions**).
+   - Send a new request to the live Public Service URL to wake a brand-new cold-started container instance.
+2. **Method B — New Revision Instance Restart:**
+   - Trigger a new Cloud Run revision deployment without code changes so Cloud Run provisions a fresh container instance and shifts 100% traffic to it.
+
+> [!NOTE]
+> **`S6` Local vs. GCP Evidence Rule:** `docker compose down && docker compose up -d` is for local reproducibility testing (`C-03`) only and **MUST NOT** be substituted for GCP `C-05` persistence evidence.
+
+#### Post-Restart Verification
+1. On the live Public Service URL (`https://crustcraft-d7wyiqxska-as.a.run.app`), perform a hard refresh (`Ctrl+F5`) and open **"My Orders"** (`/orders`).
+2. Confirm that the exact **Order ID**, line items, total amount, pickup note, status, and timestamp recorded in `AC-LAB5-08-01` remain **100% intact**.
+3. Capture **Screenshot 2 ("After Restart" Evidence)** with the live URL visible in the browser address bar.
+
+---
+
+### 11.3 `AC-LAB5-08-03`: Fast Manual Rollback Execution via `workflow_dispatch` (Recommended Practice, Handout §5 & Guide Ep. 8.1)
+
+Follow this exact protocol to roll back the Cloud Run container image from **Release B** to **Release A** without re-running CI, rebuilding Docker images, or rolling back the database:
+
+1. **Identify Release A Target SHA & Digest:**
+   - Locate the **40-character Commit SHA** of **Release A** (`e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`) from the earlier `Deploy demo` GitHub Actions Summary (`Commit SHA` / `Commit image tag`) and note its corresponding `@sha256:...` digest (`sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5`) in Artifact Registry.
+2. **Trigger Manual Rollback in GitHub Actions:**
+   - Navigate to **GitHub** -> **Actions** -> **Deploy demo** -> **Run workflow**.
+   - Select **Branch:** `main`.
+   - Enter **`image_tag`:** `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` (40-character Commit SHA of Release A).
+   - Click **Run workflow**.
+3. **Verify Internal Pipeline Mechanics (`.github/workflows/deploy.yml` & `deploy/release.sh`):**
+   - **Job `test` (`ci-docker.yml`):** **Skipped** because `inputs.image_tag` is non-empty.
+   - **Step `Build and push image`:** **Skipped** because `ROLLBACK == 'true'`.
+   - **Step `Verify image, migrate and deploy` (`bash deploy/release.sh`):**
+     - Validates that `IMAGE_TAG` matches the 40-character hexadecimal SHA regex (`^[0-9a-f]{40}$`).
+     - Resolves `asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft:e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` to its immutable `@sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` digest via `gcloud artifacts docker images describe`.
+     - **Skips `crustcraft-migrate`** (`ROLLBACK=true`), leaving the PostgreSQL 16 schema and all live data untouched.
+     - Updates Cloud Run service `crustcraft` to Release A's immutable `@sha256:...` image digest (`gcloud run services update`) and immediately runs `gcloud run services update-traffic --to-latest` to route 100% traffic to the latest revision (relying on Cloud Run's container startup health check).
+   - **Step `Smoke test public URL` (`python3 deploy/smoke_test.py "$SERVICE_URL"`):** Executes **post-switch** against the live public URL and verifies HTTP `200` on `/api/health`, `/api/ready`, and auth flows.
+     - *Traffic-Routing Qualification (`S6`):* Because `deploy/release.sh` shifts 100% of traffic **before** `smoke_test.py` runs, the smoke test verifies the rollback post-switch rather than gating traffic beforehand. Risk is minimal because Release A is an immutable, previously validated image digest; however, if pre-traffic validation or gradual canary shifting is required in future incidents, deploy manually with `--no-traffic`, verify the tagged revision URL (`--tag`), and then shift 100% traffic via `gcloud run services update-traffic`.
+   - **Step `Record deployment summary`:** Outputs `Rollback Mode: true`, the 40-character Commit SHA of Release A, and the resolved `@sha256:...` digest to `$GITHUB_STEP_SUMMARY`.
+4. **Capture Workflow Evidence:**
+   - **Screenshot 3:** GitHub Actions Rollback Run showing `test` and `Build` skipped, and `deploy` + `smoke_test` passed.
+   - **Screenshot 5:** GitHub Step Summary showing `Rollback Mode: true`, Release A's 40-char Commit SHA, and the matching `@sha256:...` image digest.
+
+---
+
+### 11.4 `AC-LAB5-08-04`: Verification of Persistence across Redeploy / Rollback (`C-05` Part B, `R-04`, `S6` & Guide Ep. 8.2)
+
+After the rollback workflow completes:
+
+1. **Verify Active Cloud Run Revision:**
+   - In GCP Console -> **Cloud Run** -> service `crustcraft` -> **Revisions**, confirm the newest active revision serves **100% traffic** and its container image points to **Release A's `@sha256:...` digest**.
+2. **Verify UI Rollback & Data Preservation:**
+   - Perform a hard refresh (`Ctrl+F5`) on `https://crustcraft-d7wyiqxska-as.a.run.app`.
+   - Confirm the frontend UI has reverted to **Release A** (the visible UI banner change introduced in Release B is no longer displayed).
+   - Confirm the signed-in customer session remains valid and the **Order ID** created in `AC-LAB5-08-01` (while running Release B) is **100% present and unaltered** in **"My Orders"** (`/orders`).
+3. **Capture Screenshot 4 ("After Redeploy/Rollback" Evidence):**
+   - Show the live Public Service URL, the reverted Release A UI, and the preserved Order record in **"My Orders"**.
+
+---
+
+### 11.5 `AC-LAB5-08-05`: Roll-Forward Recovery to Release B (Guide Ep. 8.3)
+
+Once `C-05` and Rollback evidence are captured, restore the latest production release (**Release B**) so the live system is ready for instructor grading and Lab 6 partner UAT:
+
+1. **Trigger Roll-Forward in GitHub Actions:**
+   - Navigate to **GitHub** -> **Actions** -> **Deploy demo** -> **Run workflow**.
+   - Select **Branch:** `main`.
+   - Either enter **`image_tag`:** `13932e96a1491ded7b7c1e4bfa03701b50b1e917` (fast roll-forward reusing the already-validated Release B image digest) **OR** leave `image_tag` empty to run full CI, build, and deploy current `main`.
+2. **Wait for Pipeline Completion:**
+   - Confirm the `Deploy demo` workflow and `python3 deploy/smoke_test.py "$SERVICE_URL"` pass.
+3. **Verify Restored Production State:**
+   - Hard-refresh (`Ctrl+F5`) `https://crustcraft-d7wyiqxska-as.a.run.app` and verify:
+     - The visible UI banner change from **Release B** (`CrustCraft Bakery (Release B)`) is restored.
+     - Cloud Run's latest ready revision serves **100% traffic** on **Release B's `@sha256:...` digest**.
+     - Both the Episode 8 Order created in `AC-LAB5-08-01` and the Episode 5 baseline Order (`#cmwf1j83j0002jyk1mtqxtpus`) remain completely intact in **"My Orders"** and the **Operator Queue** (`/operator/queue`).
+
+---
+
+### 11.6 `AC-LAB5-08-06`: Episode 8 Tracking Table, 5-Screenshot Evidence Checklist & Availability Compliance
+
+#### Episode 8 Persistence & Rollback Tracking Table
+
+| Phase / Step | Action Performed | Target Commit SHA (40 chars) | Image Digest (`@sha256:...`) | Active Cloud Run Revision | Test Order ID & Status | Verification Result |
+|---|---|---|---|---|---|---|
+| **1. Baseline (Release B)** | Live order created on Release B (`AC-LAB5-08-01`) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00003-ncv` (Run `44042906620`) | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **2. Restart (`C-05` Part A)** | Scale-to-zero cold start / new revision restart (`AC-LAB5-08-02`) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00003-ncv` | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **3. Rollback to Release A** | `workflow_dispatch` with `image_tag=e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` (`AC-LAB5-08-03`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-6wg` (Run `44101835981`) | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **4. Post-Rollback (`C-05` Part B)** | Hard refresh live URL; verify Release A UI & Order preserved (`AC-LAB5-08-04`) | `e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534` | `sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` | `crustcraft-00004-6wg` | `#cmwkpyktf000212bvzqayviz4` (`PENDING`) | `VERIFIED PASS` |
+| **5. Roll-Forward to Release B** | `workflow_dispatch` with `image_tag=13932e96a1491ded7b7c1e4bfa03701b50b1e917` or empty (`AC-LAB5-08-05`) | `13932e96a1491ded7b7c1e4bfa03701b50b1e917` | `sha256:3808bb9b8425cae2569faf8dc119ac171ccdc827a0d20a0935746ee96d01264c` | `crustcraft-00005-lzs` (Run `44107156025`, 100% traffic) | `#cmwkpyktf000212bvzqayviz4` & `#cmwf1j83j0002jyk1mtqxtpus` | `VERIFIED PASS` |
+
+#### 5-Screenshot Evidence Checklist (Handout Part 3 `C-05` & Part 4 `C-06` / Rollback)
+
+Use the Handout §12 caption format `"Figure X. C-05 (R-04): <what it shows>. Commit/Run/URL."` when assembling the final PDF report:
+
+- [ ] **Screenshot 1 (`Before` Baseline — `AC-LAB5-08-01`):** Browser showing **"My Orders"** (`/orders`) on `https://crustcraft-d7wyiqxska-as.a.run.app` with the newly created Episode 8 Order ID, items, total, status, and timestamp visible (passwords/secrets redacted).
+  - *Caption Template:* `Figure X. C-05 (R-04): Live production order #cmwkpyktf000212bvzqayviz4 created on Release B before restart and rollback. Commit 13932e9, https://crustcraft-d7wyiqxska-as.a.run.app.`
+- [ ] **Screenshot 2 (`After Restart` — `AC-LAB5-08-02`):** Browser showing **"My Orders"** on the live URL after Cloud Run scale-to-zero cold start or new revision restart, confirming `#cmwkpyktf000212bvzqayviz4` is 100% intact.
+  - *Caption Template:* `Figure X. C-05 (R-04): Order #cmwkpyktf000212bvzqayviz4 persisted in Cloud SQL after Cloud Run container restart. Revision crustcraft-00003-ncv, https://crustcraft-d7wyiqxska-as.a.run.app.`
+- [ ] **Screenshot 3 (GitHub Actions Rollback Run — `AC-LAB5-08-03`):** GitHub Actions `Deploy demo` workflow run graph showing `test` and `Build and push image` **Skipped**, and `Verify image, migrate and deploy` + `Smoke test public URL` **Passed**.
+  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): Manual workflow_dispatch rollback to Release A skipping CI/build/migration with smoke test passing. Run #44101835981, Commit e28ceff.`
+- [ ] **Screenshot 4 (`After Redeploy/Rollback` — `AC-LAB5-08-04`):** Browser showing the live URL reverted to **Release A** UI with `#cmwkpyktf000212bvzqayviz4` still preserved in **"My Orders"**.
+  - *Caption Template:* `Figure X. C-05 (R-04): Order #cmwkpyktf000212bvzqayviz4 preserved in Cloud SQL after Cloud Run rollback to Release A. Revision crustcraft-00004-6wg, Commit e28ceff, https://crustcraft-d7wyiqxska-as.a.run.app.`
+- [ ] **Screenshot 5 (GitHub Step Summary — `AC-LAB5-08-03`):** `Deploy demo` `$GITHUB_STEP_SUMMARY` showing `Rollback Mode: true`, Release A's 40-char Commit SHA (`e28ceffa3df72cb4cd25cd357d6fcaa03f2b6534`), and the resolved `@sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5` digest matching Cloud Run's active revision.
+  - *Caption Template:* `Figure X. C-06 / Rollback (R-08): GitHub Actions Step Summary confirming Rollback Mode: true and immutable digest match for Release A. Run #44101835981, Digest sha256:76e23c3757417d243f514941ca0e2bdbc919697d9db11de7bf00244bdfc94de5.`
+
+> [!CAUTION]
+> **Continuous Availability Policy Reminder (`B1`, Handout §3 & §12):**
+> **Cloud Run (`crustcraft`) and Cloud SQL (`crustcraft-pg`) must remain running continuously until grading has ended and Lab 6 partner UAT is complete. Pausing or running teardown during this period is strictly prohibited.**
