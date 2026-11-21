@@ -180,7 +180,7 @@ export const OrderDetailPage: React.FC = () => {
                 <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">
                   Pickup Instructions
                 </p>
-                <p className="text-sm text-amber-800 mt-1">
+                <p className="text-sm text-amber-800 mt-1 break-words">
                   {order.pickupNote}
                 </p>
               </div>
