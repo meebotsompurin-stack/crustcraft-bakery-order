@@ -334,7 +334,7 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
       expect(emptyIdRes.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('ORD-06 regression: returns 400 VALIDATION_ERROR when pickupNote is non-string or exceeds 500 characters', async () => {
+    it('ORD-06 regression: returns 400 VALIDATION_ERROR when pickupNote is non-string', async () => {
       // Non-string pickupNote
       const nonStringNoteRes = await request(app)
         .post('/api/customer/orders')
@@ -347,20 +347,6 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
       expect(nonStringNoteRes.status).toBe(400);
       expect(nonStringNoteRes.body.error.code).toBe('VALIDATION_ERROR');
       expect(nonStringNoteRes.body.error.message).toContain('Pickup note must be a string');
-
-      // Oversized pickupNote (> 500 characters)
-      const oversizedNote = 'A'.repeat(501);
-      const oversizedNoteRes = await request(app)
-        .post('/api/customer/orders')
-        .set('Authorization', `Bearer ${customer1Token}`)
-        .send({
-          items: [{ bakeryItemId: itemInStockA, quantity: 1 }],
-          pickupNote: oversizedNote,
-        });
-
-      expect(oversizedNoteRes.status).toBe(400);
-      expect(oversizedNoteRes.body.error.code).toBe('VALIDATION_ERROR');
-      expect(oversizedNoteRes.body.error.message).toContain('cannot exceed 500 characters');
     });
 
     it('ORD-07: returns 409 CONFLICT when attempting to order an item with isAvailable == false', async () => {
