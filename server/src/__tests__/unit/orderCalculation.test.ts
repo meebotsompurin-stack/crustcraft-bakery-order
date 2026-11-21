@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateOrderTotals,
   snapshotItemPrices,
+  createCustomerOrder,
   type CalculationItemInput,
 } from '../../services/orders.service';
 
@@ -106,6 +107,24 @@ describe('F-03 Order Price Calculation Unit Tests (ORD-02, ORD-03)', () => {
 
       // The previous order snapshot MUST remain 8500 satang (immutable historical record)
       expect(initialSnapshot.unitPriceAtOrder).toBe(8500);
+    });
+  });
+
+  describe('ORD-06 / Issue #58 (UAT-CC-02): pickupNote 500-character boundary validation (AC-03-07)', () => {
+    it('rejects pickupNote exceeding 500 characters (505 chars) with 400 VALIDATION_ERROR before any database transaction', async () => {
+      const oversizedPickupNote = 'A'.repeat(505);
+
+      await expect(
+        createCustomerOrder({
+          customerId: 'uat-cust-1',
+          items: [{ bakeryItemId: 'cmweuf2oh0005dh1czk35zvh1', quantity: 1 }],
+          pickupNote: oversizedPickupNote,
+        })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        code: 'VALIDATION_ERROR',
+        message: 'Pickup note cannot exceed 500 characters.',
+      });
     });
   });
 });
