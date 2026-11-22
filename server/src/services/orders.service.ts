@@ -106,7 +106,7 @@ export async function createCustomerOrder(
     );
   }
 
-  // 2. Validate pickupNote type
+  // 2. Validate pickupNote type and max length (Fix 3 / Issue #58)
   if (pickupNote !== undefined && pickupNote !== null) {
     if (typeof pickupNote !== 'string') {
       throw new AppError(
@@ -114,6 +114,14 @@ export async function createCustomerOrder(
         'VALIDATION_ERROR',
         'Pickup note must be a string.',
         [{ field: 'pickupNote', issue: 'Must be a string' }]
+      );
+    }
+    if (pickupNote.trim().length > 500) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Pickup note cannot exceed 500 characters.',
+        [{ field: 'pickupNote', issue: 'Cannot exceed 500 characters' }]
       );
     }
   }
