@@ -162,9 +162,9 @@ export const OperatorOrderDetailPage: React.FC = () => {
               </p>
             </div>
             {order.pickupNote && (
-              <div className="sm:col-span-2 bg-amber-50/60 p-3 rounded-lg border border-amber-100">
+              <div className="sm:col-span-2 bg-amber-50/60 p-3 rounded-lg border border-amber-100 min-w-0">
                 <span className="text-xs text-amber-800 font-medium">Customer Pickup Note</span>
-                <p className="text-xs italic text-stone-700 mt-0.5 break-words">
+                <p className="text-xs italic text-stone-700 mt-0.5 min-w-0 break-words [overflow-wrap:anywhere]">
                   "{order.pickupNote}"
                 </p>
               </div>
