@@ -335,7 +335,6 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
     });
 
     it('ORD-06 regression: returns 400 VALIDATION_ERROR when pickupNote is non-string', async () => {
-      // Non-string pickupNote
       const nonStringNoteRes = await request(app)
         .post('/api/customer/orders')
         .set('Authorization', `Bearer ${customer1Token}`)
@@ -346,7 +345,54 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
 
       expect(nonStringNoteRes.status).toBe(400);
       expect(nonStringNoteRes.body.error.code).toBe('VALIDATION_ERROR');
-      expect(nonStringNoteRes.body.error.message).toContain('Pickup note must be a string');
+      expect(nonStringNoteRes.body.error.message).toBe('Pickup note must be a string.');
+      expect(nonStringNoteRes.body.error.details).toEqual([
+        { field: 'pickupNote', issue: 'Must be a string' },
+      ]);
+    });
+
+    it.each([501, 505])(
+      'ORD-06 / Issue #58: rejects %i-character pickupNote with exact 400 error, no Order/OrderItem rows and unchanged stock',
+      async (length) => {
+        const stockBefore = (await prisma.bakeryItem.findUnique({ where: { id: itemInStockA } }))?.stockQuantity;
+        const ordersBefore = await prisma.order.count({ where: { customerId: customer1.id } });
+        const orderItemsBefore = await prisma.orderItem.count({ where: { bakeryItemId: itemInStockA } });
+
+        const res = await request(app)
+          .post('/api/customer/orders')
+          .set('Authorization', `Bearer ${customer1Token}`)
+          .send({
+            items: [{ bakeryItemId: itemInStockA, quantity: 1 }],
+            pickupNote: 'A'.repeat(length),
+          });
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        expect(res.body.error.message).toBe('Pickup note cannot exceed 500 characters.');
+        expect(res.body.error.details).toEqual([
+          { field: 'pickupNote', issue: 'Cannot exceed 500 characters' },
+        ]);
+
+        const stockAfter = (await prisma.bakeryItem.findUnique({ where: { id: itemInStockA } }))?.stockQuantity;
+        expect(stockAfter).toBe(stockBefore);
+        expect(await prisma.order.count({ where: { customerId: customer1.id } })).toBe(ordersBefore);
+        expect(await prisma.orderItem.count({ where: { bakeryItemId: itemInStockA } })).toBe(orderItemsBefore);
+      }
+    );
+
+    it('ORD-06 / Issue #58 boundary: accepts exactly 500-character pickupNote with 201 Created', async () => {
+      const note = 'A'.repeat(500);
+      const res = await request(app)
+        .post('/api/customer/orders')
+        .set('Authorization', `Bearer ${customer1Token}`)
+        .send({
+          items: [{ bakeryItemId: itemInStockA, quantity: 1 }],
+          pickupNote: note,
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.order.pickupNote).toBe(note);
+      expect(res.body.order.pickupNote).toHaveLength(500);
     });
 
     it('ORD-07: returns 409 CONFLICT when attempting to order an item with isAvailable == false', async () => {

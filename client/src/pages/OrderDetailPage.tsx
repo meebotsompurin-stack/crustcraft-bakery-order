@@ -176,11 +176,11 @@ export const OrderDetailPage: React.FC = () => {
 
             {/* Special Instructions */}
             {order.pickupNote && (
-              <div className="mt-6 p-4 rounded-xl bg-amber-50/70 border border-amber-200/60">
+              <div className="mt-6 p-4 rounded-xl bg-amber-50/70 border border-amber-200/60 min-w-0">
                 <p className="text-xs font-bold text-amber-900 uppercase tracking-wide">
                   Pickup Instructions
                 </p>
-                <p className="text-sm text-amber-800 mt-1">
+                <p className="text-sm text-amber-800 mt-1 min-w-0 break-words [overflow-wrap:anywhere]">
                   {order.pickupNote}
                 </p>
               </div>

@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { prisma } from '../../lib/db';
+import { AppError } from '../../services/auth.service';
 import {
   calculateOrderTotals,
   snapshotItemPrices,
+  createCustomerOrder,
   type CalculationItemInput,
 } from '../../services/orders.service';
 
@@ -106,6 +109,51 @@ describe('F-03 Order Price Calculation Unit Tests (ORD-02, ORD-03)', () => {
 
       // The previous order snapshot MUST remain 8500 satang (immutable historical record)
       expect(initialSnapshot.unitPriceAtOrder).toBe(8500);
+    });
+  });
+
+  describe('ORD-06 / Issue #58 (UAT-CC-02): pickupNote 500-character boundary validation (AC-03-07)', () => {
+    const expectedDetails = [{ field: 'pickupNote', issue: 'Cannot exceed 500 characters' }];
+    const items = [{ bakeryItemId: 'cmweuf2oh0005dh1czk35zvh1', quantity: 1 }];
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it.each([501, 505])(
+      'rejects pickupNote of %i characters with exact 400 VALIDATION_ERROR and never opens prisma.$transaction',
+      async (length) => {
+        const txSpy = vi.spyOn(prisma, '$transaction');
+
+        const error = await createCustomerOrder({
+          customerId: 'uat-cust-1',
+          items,
+          pickupNote: 'A'.repeat(length),
+        }).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(AppError);
+        const appError = error as AppError;
+        expect(appError.statusCode).toBe(400);
+        expect(appError.code).toBe('VALIDATION_ERROR');
+        expect(appError.message).toBe('Pickup note cannot exceed 500 characters.');
+        expect(appError.details).toEqual(expectedDetails);
+        expect(txSpy).not.toHaveBeenCalled();
+      }
+    );
+
+    it('does not reject a pickupNote of exactly 500 characters at the validation stage (proceeds to prisma.$transaction)', async () => {
+      const txSpy = vi
+        .spyOn(prisma, '$transaction')
+        .mockRejectedValue(new Error('TX_REACHED'));
+
+      await expect(
+        createCustomerOrder({
+          customerId: 'uat-cust-1',
+          items,
+          pickupNote: 'A'.repeat(500),
+        })
+      ).rejects.toThrow('TX_REACHED');
+      expect(txSpy).toHaveBeenCalledTimes(1);
     });
   });
 });
