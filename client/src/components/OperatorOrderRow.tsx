@@ -1,27 +1,67 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import type { OrderResponse } from '../services/api';
+import type { OrderResponse, OrderStatus } from '../services/api';
+import { PaymentStatusBadge } from './PaymentStatusBadge';
 
 export interface OperatorOrderRowProps {
   order: OrderResponse;
-  onAcceptOrder: (orderId: string) => Promise<void>;
-  isAccepting: boolean;
+  onUpdateStatus: (orderId: string, nextStatus: OrderStatus) => Promise<void>;
+  isUpdating: boolean;
 }
+
+const STATUS_BADGE_CLASSES: Record<OrderStatus, string> = {
+  PENDING: 'bg-amber-100 text-amber-800 border border-amber-300',
+  ACCEPTED: 'bg-blue-100 text-blue-800 border border-blue-300',
+  BAKING: 'bg-orange-100 text-orange-800 border border-orange-300',
+  READY_FOR_PICKUP: 'bg-purple-100 text-purple-800 border border-purple-300',
+  COMPLETED: 'bg-emerald-100 text-emerald-800 border border-emerald-300',
+  CANCELLED: 'bg-rose-100 text-rose-800 border border-rose-300',
+};
+
+const NEXT_STEP_CONFIG: Partial<
+  Record<OrderStatus, { nextStatus: OrderStatus; label: string; pendingLabel: string; buttonClass: string }>
+> = {
+  PENDING: {
+    nextStatus: 'ACCEPTED',
+    label: 'Accept Order',
+    pendingLabel: 'Accepting...',
+    buttonClass: 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800',
+  },
+  ACCEPTED: {
+    nextStatus: 'BAKING',
+    label: 'Start Baking',
+    pendingLabel: 'Updating...',
+    buttonClass: 'bg-orange-600 hover:bg-orange-700 active:bg-orange-800',
+  },
+  BAKING: {
+    nextStatus: 'READY_FOR_PICKUP',
+    label: 'Mark Ready',
+    pendingLabel: 'Updating...',
+    buttonClass: 'bg-purple-600 hover:bg-purple-700 active:bg-purple-800',
+  },
+  READY_FOR_PICKUP: {
+    nextStatus: 'COMPLETED',
+    label: 'Complete',
+    pendingLabel: 'Completing...',
+    buttonClass: 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800',
+  },
+};
 
 export const OperatorOrderRow: React.FC<OperatorOrderRowProps> = ({
   order,
-  onAcceptOrder,
-  isAccepting,
+  onUpdateStatus,
+  isUpdating,
 }) => {
   const formattedTotal = `฿${(order.totalAmount / 100).toFixed(2)}`;
-  const itemSummary = order.items && order.items.length > 0
-    ? order.items
-        .map(
-          (item) =>
-            `${item.quantity}x ${item.bakeryItem?.name || 'Bakery Item'}`
-        )
-        .join(', ')
-    : 'No items';
+  const itemSummary =
+    order.items && order.items.length > 0
+      ? order.items
+          .map(
+            (item) =>
+              `${item.quantity}x ${item.bakeryItem?.name || 'Bakery Item'}`
+          )
+          .join(', ')
+      : 'No items';
 
   const formattedDate = new Date(order.createdAt).toLocaleString('en-US', {
     month: 'short',
@@ -30,6 +70,11 @@ export const OperatorOrderRow: React.FC<OperatorOrderRowProps> = ({
     minute: '2-digit',
   });
 
+  const badgeClass =
+    STATUS_BADGE_CLASSES[order.status] ||
+    'bg-stone-100 text-stone-700 border border-stone-300';
+  const nextStep = NEXT_STEP_CONFIG[order.status];
+
   return (
     <div
       data-order-id={order.id}
@@ -37,19 +82,16 @@ export const OperatorOrderRow: React.FC<OperatorOrderRowProps> = ({
     >
       {/* Left info column */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between lg:justify-start gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-xs font-semibold text-stone-500">
             #{order.id.slice(-8)}
           </span>
           <span
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-              order.status === 'PENDING'
-                ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-            }`}
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${badgeClass}`}
           >
             {order.status}
           </span>
+          <PaymentStatusBadge status={order.paymentStatus} />
           <span className="text-xs text-stone-400 hidden sm:inline">
             {formattedDate}
           </span>
@@ -66,7 +108,7 @@ export const OperatorOrderRow: React.FC<OperatorOrderRowProps> = ({
             {itemSummary}
           </p>
           {order.pickupNote && (
-            <p className="text-xs italic text-amber-700 mt-1 bg-amber-50 p-1.5 rounded border border-amber-100">
+            <p className="text-xs italic text-amber-700 mt-1 bg-amber-50 p-1.5 rounded border border-amber-100 break-words [overflow-wrap:anywhere]">
               Note: {order.pickupNote}
             </p>
           )}
@@ -95,18 +137,22 @@ export const OperatorOrderRow: React.FC<OperatorOrderRowProps> = ({
           View Details
         </Link>
 
-        {order.status === 'PENDING' ? (
+        {nextStep ? (
           <button
             type="button"
-            disabled={isAccepting}
-            onClick={() => onAcceptOrder(order.id)}
-            className="inline-flex justify-center items-center px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 text-white text-xs font-semibold transition shadow-sm"
+            disabled={isUpdating}
+            onClick={() => onUpdateStatus(order.id, nextStep.nextStatus)}
+            className={`inline-flex justify-center items-center px-4 py-2 rounded-lg disabled:opacity-50 text-white text-xs font-semibold transition shadow-sm ${nextStep.buttonClass}`}
           >
-            {isAccepting ? 'Accepting...' : 'Accept Order'}
+            {isUpdating ? nextStep.pendingLabel : nextStep.label}
           </button>
-        ) : (
+        ) : order.status === 'COMPLETED' ? (
           <span className="inline-flex justify-center items-center px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-            Accepted ✓
+            Completed ✓
+          </span>
+        ) : (
+          <span className="inline-flex justify-center items-center px-3 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
+            Cancelled
           </span>
         )}
       </div>

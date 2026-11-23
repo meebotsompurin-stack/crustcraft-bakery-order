@@ -80,7 +80,17 @@ export async function getCurrentUserApi(): Promise<{ user: UserResponse }> {
 // F-02 Catalog & F-03 Customer Pre-Order API Clients
 // -------------------------------------------------------------
 
-export type OrderStatus = 'PENDING' | 'ACCEPTED';
+export type OrderStatus =
+  | 'PENDING'
+  | 'ACCEPTED'
+  | 'BAKING'
+  | 'READY_FOR_PICKUP'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type PaymentStatus = 'UNPAID' | 'PAID' | 'FAILED';
+
+export type SimulatePaymentOutcome = 'SUCCESS' | 'FAIL';
 
 export interface BakeryItemDto {
   id: string;
@@ -118,6 +128,7 @@ export interface OrderDto {
     email: string;
   };
   status: OrderStatus;
+  paymentStatus: PaymentStatus;
   totalAmount: number; // integer satang
   pickupNote: string | null;
   items: OrderItemDto[];
@@ -199,6 +210,42 @@ export async function updateOperatorOrderStatusApi(
     {
       method: 'PATCH',
       body: JSON.stringify({ status }),
+    }
+  );
+}
+
+// -------------------------------------------------------------
+// F-06 Cancellation & F-07 Simulated Payment API Clients
+// -------------------------------------------------------------
+
+export async function cancelCustomerOrderApi(
+  orderId: string
+): Promise<{ order: OrderDto }> {
+  return requestJson<{ order: OrderDto }>(`/customer/orders/${orderId}/cancel`, {
+    method: 'PATCH',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function simulateCustomerPaymentApi(
+  orderId: string,
+  simulateOutcome: SimulatePaymentOutcome = 'SUCCESS'
+): Promise<{ order: OrderDto }> {
+  return requestJson<{ order: OrderDto }>(`/customer/orders/${orderId}/pay`, {
+    method: 'POST',
+    body: JSON.stringify({ simulateOutcome }),
+  });
+}
+
+export async function updateOperatorOrderPaymentApi(
+  orderId: string,
+  paymentStatus: PaymentStatus
+): Promise<{ order: OrderResponse }> {
+  return requestJson<{ order: OrderResponse }>(
+    `/operator/orders/${orderId}/payment`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ paymentStatus }),
     }
   );
 }
