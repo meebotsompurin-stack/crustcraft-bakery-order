@@ -1,12 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getCustomerOrderByIdApi, type OrderDto } from '../services/api';
+import {
+  cancelCustomerOrderApi,
+  getCustomerOrderByIdApi,
+  type OrderDto,
+  type OrderStatus,
+} from '../services/api';
+import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
+import { SimulatedPaymentCard } from '../components/SimulatedPaymentCard';
+
+const TIMELINE_STEPS: Array<{ status: OrderStatus; label: string }> = [
+  { status: 'PENDING', label: 'Pending' },
+  { status: 'ACCEPTED', label: 'Accepted' },
+  { status: 'BAKING', label: 'Baking' },
+  { status: 'READY_FOR_PICKUP', label: 'Ready' },
+  { status: 'COMPLETED', label: 'Completed' },
+];
 
 export const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderDto | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
+  const [confirmingCancel, setConfirmingCancel] = useState<boolean>(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
@@ -42,6 +61,26 @@ export const OrderDetailPage: React.FC = () => {
     };
   }, [id]);
 
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    try {
+      setIsCancelling(true);
+      setCancelError(null);
+      const data = await cancelCustomerOrderApi(order.id);
+      setOrder(data.order);
+      setConfirmingCancel(false);
+      setCancelSuccess(
+        'Your pre-order has been cancelled and reserved bakery inventory has been restored.'
+      );
+    } catch (err: unknown) {
+      setCancelError(
+        err instanceof Error ? err.message : 'Failed to cancel order'
+      );
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -56,9 +95,27 @@ export const OrderDetailPage: React.FC = () => {
             Accepted / รับออเดอร์แล้ว
           </span>
         );
+      case 'BAKING':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800 border border-orange-300">
+            Baking / กำลังอบ
+          </span>
+        );
+      case 'READY_FOR_PICKUP':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300">
+            Ready for Pickup / พร้อมรับสินค้า
+          </span>
+        );
+      case 'COMPLETED':
+        return (
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+            Completed / เสร็จสมบูรณ์
+          </span>
+        );
       case 'CANCELLED':
         return (
-          <span className="px-3 py-1 rounded-full text-xs font-bold bg-stone-100 text-stone-600 border border-stone-300">
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-300">
             Cancelled / ยกเลิกแล้ว
           </span>
         );
@@ -70,6 +127,10 @@ export const OrderDetailPage: React.FC = () => {
         );
     }
   };
+
+  const currentStepIndex = order
+    ? TIMELINE_STEPS.findIndex((step) => step.status === order.status)
+    : -1;
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-8 py-8">
@@ -85,6 +146,24 @@ export const OrderDetailPage: React.FC = () => {
           Pre-Order Details
         </h1>
       </div>
+
+      {cancelError && (
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-800"
+        >
+          {cancelError}
+        </div>
+      )}
+
+      {cancelSuccess && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800"
+        >
+          {cancelSuccess}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center text-stone-500">
@@ -128,13 +207,43 @@ export const OrderDetailPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-start sm:items-end gap-1.5">
               <span className="text-xs font-semibold text-stone-500">
                 Current Status
               </span>
-              {getStatusBadge(order.status)}
+              <div className="flex flex-wrap items-center gap-2">
+                {getStatusBadge(order.status)}
+                <PaymentStatusBadge status={order.paymentStatus} />
+              </div>
             </div>
           </div>
+
+          {/* Fulfillment Progress Timeline */}
+          {order.status !== 'CANCELLED' && (
+            <div className="px-6 pt-5 pb-2 border-b border-stone-100">
+              <div className="grid grid-cols-5 gap-2">
+                {TIMELINE_STEPS.map((step, index) => {
+                  const isReached = currentStepIndex >= index;
+                  return (
+                    <div key={step.status} className="flex flex-col items-center text-center">
+                      <div
+                        className={`w-full h-1.5 rounded-full mb-1.5 ${
+                          isReached ? 'bg-amber-600' : 'bg-stone-200'
+                        }`}
+                      />
+                      <span
+                        className={`text-[11px] font-semibold ${
+                          isReached ? 'text-amber-900' : 'text-stone-400'
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Line Items Breakdown */}
           <div className="p-6">
@@ -201,6 +310,57 @@ export const OrderDetailPage: React.FC = () => {
                 ฿{(order.totalAmount / 100).toFixed(2)}
               </span>
             </div>
+
+            {/* Customer Simulated Payment Card */}
+            <SimulatedPaymentCard
+              mode="CUSTOMER"
+              order={order}
+              onOrderUpdated={setOrder}
+            />
+
+            {/* Customer Cancel Order Control (strictly when PENDING) */}
+            {order.status === 'PENDING' && (
+              <div className="mt-6 pt-5 border-t border-stone-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-stone-700">
+                    Need to change plans?
+                  </p>
+                  <p className="text-xs text-stone-500">
+                    Orders can be cancelled while still Pending Acceptance. Reserved stock is restored automatically.
+                  </p>
+                </div>
+
+                {!confirmingCancel ? (
+                  <button
+                    type="button"
+                    disabled={isCancelling}
+                    onClick={() => setConfirmingCancel(true)}
+                    className="self-start sm:self-auto px-4 py-2 rounded-lg border border-rose-300 bg-white hover:bg-rose-50 disabled:opacity-50 text-rose-700 text-xs font-semibold transition"
+                  >
+                    Cancel Order
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isCancelling}
+                      onClick={handleCancelOrder}
+                      className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition"
+                    >
+                      {isCancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isCancelling}
+                      onClick={() => setConfirmingCancel(false)}
+                      className="px-3.5 py-2 rounded-lg border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 text-xs font-semibold transition"
+                    >
+                      Keep Order
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

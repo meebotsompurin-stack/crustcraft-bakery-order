@@ -1,50 +1,49 @@
 import { prisma } from '../lib/db';
+import {
+  ORDER_STATUSES,
+  ALLOWED_TRANSITIONS,
+  isValidOrderStatus,
+  canTransitionOrderStatus,
+  getStatusSortPriority,
+  type OrderStatus,
+} from '../lib/orderStatus';
 import { AppError } from './auth.service';
 
-export type OrderStatus = 'PENDING' | 'ACCEPTED';
+export type { OrderStatus };
+export { ORDER_STATUSES as KNOWN_ORDER_STATUSES, ALLOWED_TRANSITIONS };
 
-export const KNOWN_ORDER_STATUSES: OrderStatus[] = ['PENDING', 'ACCEPTED'];
-
-export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ['ACCEPTED'],
-  ACCEPTED: [], // Sprint 1: no further transitions allowed
-};
-
-const STATUS_PRIORITY: Record<string, number> = {
-  PENDING: 0,
-  ACCEPTED: 1,
-};
-
-export async function listOperatorOrders() {
-  const orders = await prisma.order.findMany({
+const operatorOrderInclude = {
+  customer: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  items: {
     include: {
-      customer: {
+      bakeryItem: {
         select: {
           id: true,
           name: true,
-          email: true,
-        },
-      },
-      items: {
-        include: {
-          bakeryItem: {
-            select: {
-              id: true,
-              name: true,
-              category: true,
-            },
-          },
+          category: true,
         },
       },
     },
+  },
+} as const;
+
+export async function listOperatorOrders() {
+  const orders = await prisma.order.findMany({
+    include: operatorOrderInclude,
     orderBy: {
       createdAt: 'desc',
     },
   });
 
   return orders.sort((a, b) => {
-    const priorityA = STATUS_PRIORITY[a.status] ?? 99;
-    const priorityB = STATUS_PRIORITY[b.status] ?? 99;
+    const priorityA = getStatusSortPriority(a.status);
+    const priorityB = getStatusSortPriority(b.status);
     if (priorityA !== priorityB) {
       return priorityA - priorityB;
     }
@@ -55,26 +54,7 @@ export async function listOperatorOrders() {
 export async function getOperatorOrderById(orderId: string) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: {
-      customer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      items: {
-        include: {
-          bakeryItem: {
-            select: {
-              id: true,
-              name: true,
-              category: true,
-            },
-          },
-        },
-      },
-    },
+    include: operatorOrderInclude,
   });
 
   if (!order) {
@@ -85,11 +65,7 @@ export async function getOperatorOrderById(orderId: string) {
 }
 
 export async function updateOrderStatus(orderId: string, targetStatus: unknown) {
-  if (
-    !targetStatus ||
-    typeof targetStatus !== 'string' ||
-    !KNOWN_ORDER_STATUSES.includes(targetStatus as OrderStatus)
-  ) {
+  if (!isValidOrderStatus(targetStatus)) {
     throw new AppError(400, 'VALIDATION_ERROR', 'Invalid status value provided');
   }
 
@@ -101,10 +77,7 @@ export async function updateOrderStatus(orderId: string, targetStatus: unknown) 
     throw new AppError(404, 'NOT_FOUND', 'Order not found');
   }
 
-  const currentStatus = existingOrder.status as OrderStatus;
-  const allowedNext = ALLOWED_TRANSITIONS[currentStatus] || [];
-
-  if (!allowedNext.includes(targetStatus as OrderStatus)) {
+  if (!canTransitionOrderStatus(existingOrder.status, targetStatus)) {
     throw new AppError(
       409,
       'CONFLICT',
@@ -112,8 +85,44 @@ export async function updateOrderStatus(orderId: string, targetStatus: unknown) 
     );
   }
 
+  // Atomic cancellation from PENDING: conditionally update status and restore inventory (BR-03, BR-07)
+  if (targetStatus === 'CANCELLED') {
+    return prisma.$transaction(async (tx) => {
+      const result = await tx.order.updateMany({
+        where: { id: orderId, status: 'PENDING' },
+        data: { status: 'CANCELLED' },
+      });
+
+      if (result.count === 0) {
+        throw new AppError(
+          409,
+          'CONFLICT',
+          'Order status was changed concurrently and can no longer be cancelled'
+        );
+      }
+
+      const orderItems = await tx.orderItem.findMany({
+        where: { orderId },
+      });
+
+      for (const item of orderItems) {
+        await tx.bakeryItem.update({
+          where: { id: item.bakeryItemId },
+          data: {
+            stockQuantity: { increment: item.quantity },
+          },
+        });
+      }
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: operatorOrderInclude,
+      });
+    });
+  }
+
   // Atomic conditional update: only succeeds if the row still has the status we validated,
-  // so concurrent operators cannot both accept the same order (BR-06, BR-07).
+  // so concurrent operators cannot double-advance the same order (BR-06, BR-07).
   const result = await prisma.order.updateMany({
     where: { id: orderId, status: existingOrder.status },
     data: { status: targetStatus },
@@ -127,29 +136,8 @@ export async function updateOrderStatus(orderId: string, targetStatus: unknown) 
     );
   }
 
-  const updatedOrder = await prisma.order.findUniqueOrThrow({
+  return prisma.order.findUniqueOrThrow({
     where: { id: orderId },
-    include: {
-      customer: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-      items: {
-        include: {
-          bakeryItem: {
-            select: {
-              id: true,
-              name: true,
-              category: true,
-            },
-          },
-        },
-      },
-    },
+    include: operatorOrderInclude,
   });
-
-  return updatedOrder;
 }

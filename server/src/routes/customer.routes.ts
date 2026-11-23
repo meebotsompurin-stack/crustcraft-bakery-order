@@ -5,7 +5,9 @@ import {
   createOrderHandler,
   getCustomerOrdersHandler,
   getCustomerOrderByIdHandler,
+  cancelCustomerOrderHandler,
 } from '../controllers/orders.controller';
+import { simulateCustomerPaymentHandler } from '../controllers/payment.controller';
 
 export const customerRouter = Router();
 
@@ -16,3 +18,5 @@ customerRouter.use(requireRole(['CUSTOMER']));
 customerRouter.post('/orders', createOrderHandler);
 customerRouter.get('/orders', getCustomerOrdersHandler);
 customerRouter.get('/orders/:id', getCustomerOrderByIdHandler);
+customerRouter.patch('/orders/:id/cancel', cancelCustomerOrderHandler);
+customerRouter.post('/orders/:id/pay', simulateCustomerPaymentHandler);
