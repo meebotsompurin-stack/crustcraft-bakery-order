@@ -12,7 +12,7 @@
 
 ## 1. Wave Execution Order (Wave 0 Plan + 5 Core Delivery Issues)
 
-> **Rule:** `1 Issue = 1 Branch = 1 PR → sprint-2-staging`, followed by `1 Reviewed Release PR (sprint-2-staging → main)` tagged `v2.0.0`.  
+> **Rule:** `1 Issue = 1 Branch = 1 PR → sprint-2-staging`, followed by **two reviewed Release PRs (`sprint-2-staging` → `main`)** so the standalone Sprint 2 release (`v2.0.0-sprint2`) remains identifiable separately from the Sprint 3 integrated candidate (`v2.1.0-s3-progress`) per Deliverable 2 Part B.  
 > **Hard Stop 1 (Plan Alignment):** `S2-ISSUE-00` (`#67`) merges first so both teammates approve the plan and enable CI on `sprint-2-staging`.  
 > **Hard Stop 2 (Spec DD):** `S2-ISSUE-01` (`#61`) MUST be reviewed and merged into `sprint-2-staging` **before** any implementation commits in Wave 2–4 so Git timestamps prove contracts predated code.
 
@@ -22,26 +22,31 @@
 | **1** | [`S2-ISSUE-01`](./S2-ISSUE-01.md) | [#61](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/61) | `docs/s2-issue-01-contracts-and-setup` | `@poom2548` | `@meebotsompurin-stack` | ❌ Spec before Code | Part B & C Contracts, Part D Baseline Sync |
 | **2** | [`S2-ISSUE-02`](./S2-ISSUE-02.md) | [#62](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/62) | `feat/s2-issue-02-fulfillment-cancel-payment` | `@meebotsompurin-stack` | `@poom2548` | ✅ Parallel with `#63` | Part B (`F-06` Fulfillment/Cancel + `F-07` Payment + Prisma Migration) |
 | **2** | [`S2-ISSUE-03`](./S2-ISSUE-03.md) | [#63](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/63) | `feat/s2-issue-03-catalog-admin` | `@poom2548` | `@meebotsompurin-stack` | ✅ Parallel with `#62` | Part B (`F-05` Bakery Catalog Administration) |
-| **3** | [`S2-ISSUE-04`](./S2-ISSUE-04.md) | [#64](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/64) | `feat/s2-issue-04-sales-reporting` | `@poom2548` | `@meebotsompurin-stack` | ❌ After `#62` merged | Part C (`F-08` Sprint 3 Working Progress — Sales Reporting) |
-| **4** | [`S2-ISSUE-05`](./S2-ISSUE-05.md) | [#65](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/65) | `test/s2-issue-05-e2e-traceability-release` | `@meebotsompurin-stack` *(Pair)* | `@poom2548` | ❌ Final Integration | Part A, C (Remaining-Work), D (Traceability), E (E2E/Deploy `v2.0.0`) |
+| **3** | [`S2-ISSUE-04`](./S2-ISSUE-04.md) | [#64](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/64) | `feat/s2-issue-04-sales-reporting` | `@poom2548` | `@meebotsompurin-stack` | ❌ After `v2.0.0-sprint2` | Part C (`F-08` Sprint 3 Working Progress — Sales Reporting) |
+| **4** | [`S2-ISSUE-05`](./S2-ISSUE-05.md) | [#65](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/65) | `test/s2-issue-05-e2e-traceability-release` | `@meebotsompurin-stack` *(Pair)* | `@poom2548` | ❌ Final Integration | Part A, C (Remaining-Work), D (Traceability), E (`v2.1.0-s3-progress`) |
 
-### Merge Order
+### Merge & Release Order (Two Identifiable Releases on `main`)
 ```text
-Wave 0: #67 (chore/s2-issue-00-master-plan)              → sprint-2-staging  [Plan Alignment & CI Trigger]
-           ↓
-Wave 1: #61 (docs/s2-issue-01-contracts-and-setup)       → sprint-2-staging  [Spec DD Timestamp Gate!]
-           ↓
-Wave 2: #62 (feat/s2-issue-02-fulfillment-cancel-payment) → sprint-2-staging  (Parallel-safe)
-        #63 (feat/s2-issue-03-catalog-admin)              → sprint-2-staging  (Parallel-safe)
-           ↓
-Wave 3: #64 (feat/s2-issue-04-sales-reporting)            → sprint-2-staging
-           ↓
-Wave 4: #65 (test/s2-issue-05-e2e-traceability-release)   → sprint-2-staging
-           ↓
-Release: sprint-2-staging → main (Reviewed Release PR, Tag v2.0.0 → GCP Auto-Deploy)
+Wave 0:   #67 (chore/s2-issue-00-master-plan)              → sprint-2-staging  [Plan Alignment & CI Trigger]
+             ↓
+Wave 1:   #61 (docs/s2-issue-01-contracts-and-setup)       → sprint-2-staging  [Spec DD Timestamp Gate!]
+             ↓
+Wave 2:   #62 (feat/s2-issue-02-fulfillment-cancel-payment) → sprint-2-staging  (Parallel-safe)
+          #63 (feat/s2-issue-03-catalog-admin)              → sprint-2-staging  (Parallel-safe)
+             ↓
+Release 1 (Sprint 2 Standalone — Deliverable 2 Part B):
+          Sprint 2 E2E (E2E-S2-01..04, 06) verified on sprint-2-staging
+          sprint-2-staging → main (Reviewed Release PR, Tag v2.0.0-sprint2)
+             ↓
+Wave 3:   #64 (feat/s2-issue-04-sales-reporting)            → sprint-2-staging  [Sprint 3 Progress: F-08]
+             ↓
+Wave 4:   #65 (test/s2-issue-05-e2e-traceability-release)   → sprint-2-staging  [E2E-S2-05, Traceability & Readiness Docs]
+             ↓
+Release 2 (Integrated Release Candidate — Deliverable 2 Part C/D/E):
+          sprint-2-staging → main (Reviewed Release PR, Tag v2.1.0-s3-progress → GCP Auto-Deploy & Smoke Check)
 ```
 
-> **Lab 6 Release Guard:** Do NOT merge the final Release PR (`sprint-2-staging` → `main`) until Lab 6 UAT evidence and partner re-test verification on the Lab 6 release are fully captured!
+> **Lab 6 Release Guard:** Do NOT merge Release 1 (`v2.0.0-sprint2`) or Release 2 (`v2.1.0-s3-progress`) into `main` until Lab 6 UAT evidence and partner re-test verification on the Lab 6 release are fully captured!
 
 ---
 
@@ -49,13 +54,13 @@ Release: sprint-2-staging → main (Reviewed Release PR, Tag v2.0.0 → GCP Auto
 
 | File / Directory | `#62` (`S2-ISSUE-02`: F-06/F-07) | `#63` (`S2-ISSUE-03`: F-05) | `#64` (`S2-ISSUE-04`: F-08) |
 |---|:---:|:---:|:---:|
-| `prisma/schema.prisma`, `prisma/migrations/*`, `prisma/seed.ts` | ✅ owns | ❌ | ❌ |
+| `prisma/schema.prisma`, `prisma/migrations/*` *(note: `prisma/seed.ts` unchanged)* | ✅ owns | ❌ | ❌ |
 | `server/src/lib/orderStatus.ts` | ✅ owns | ❌ | ❌ |
 | `server/src/services/operator.service.ts` + `orders.service.ts` | ✅ owns | ❌ | ❌ |
 | `server/src/services/payment.service.ts` + `payment.controller.ts` | ✅ owns | ❌ | ❌ |
 | `server/src/services/catalogAdmin.service.ts` + `catalogAdmin.controller.ts` | ❌ | ✅ owns | ❌ |
 | `server/src/services/reporting.service.ts` + `reporting.controller.ts` | ❌ | ❌ | ✅ owns |
-| `client/src/components/PaymentStatusBadge.tsx`, `SimulatedPaymentCard.tsx` | ✅ owns | ❌ | ❌ |
+| `client/src/components/PaymentStatusBadge.tsx`, `SimulatedPaymentCard.tsx`, `OperatorOrderRow.tsx` | ✅ owns | ❌ | ❌ |
 | `client/src/pages/OrderDetailPage.tsx`, `MyOrdersPage.tsx`, `OperatorOrder*.tsx` | ✅ owns | ❌ | ❌ |
 | `client/src/pages/OperatorCatalogPage.tsx` | ❌ | ✅ owns | ❌ |
 | `client/src/pages/OperatorReportsPage.tsx` | ❌ | ❌ | ✅ owns |

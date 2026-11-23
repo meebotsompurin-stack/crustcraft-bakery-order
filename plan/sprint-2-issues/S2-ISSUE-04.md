@@ -2,7 +2,7 @@
 
 > **GitHub Issue:** [#64](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/64)  
 > **Wave:** 3 (Sprint 3 Working Progress for Deliverable 2 Part C — 15 pts)  
-> **Depends on:** `#61` (`S2-ISSUE-01`) & `#62` (`S2-ISSUE-02`) merged into `sprint-2-staging`  
+> **Depends on:** `#61` (`S2-ISSUE-01`) & `#62` (`S2-ISSUE-02`) merged (merges into `sprint-2-staging` after standalone Sprint 2 Release 1 `v2.0.0-sprint2` is tagged on `main`)  
 > **Branch:** `feat/s2-issue-04-sales-reporting` → `sprint-2-staging`  
 > **Assignee:** `@poom2548` | **Reviewer:** `@meebotsompurin-stack`
 
