@@ -249,3 +249,45 @@ export async function updateOperatorOrderPaymentApi(
     }
   );
 }
+
+// -------------------------------------------------------------
+// F-05 Operator Catalog Administration API Clients
+// -------------------------------------------------------------
+
+export interface CreateBakeryItemPayload {
+  name: string;
+  description: string;
+  price: number; // integer satang (> 0)
+  stockQuantity: number; // integer (>= 0)
+  category: string;
+  isAvailable?: boolean;
+}
+
+export type UpdateBakeryItemPayload = Partial<CreateBakeryItemPayload>;
+
+export async function getOperatorCatalogApi(): Promise<{
+  items: BakeryItemDto[];
+}> {
+  return requestJson<{ items: BakeryItemDto[] }>('/operator/catalog', {
+    method: 'GET',
+  });
+}
+
+export async function createOperatorCatalogItemApi(
+  payload: CreateBakeryItemPayload
+): Promise<{ item: BakeryItemDto }> {
+  return requestJson<{ item: BakeryItemDto }>('/operator/catalog', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateOperatorCatalogItemApi(
+  itemId: string,
+  payload: UpdateBakeryItemPayload
+): Promise<{ item: BakeryItemDto }> {
+  return requestJson<{ item: BakeryItemDto }>(`/operator/catalog/${itemId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
