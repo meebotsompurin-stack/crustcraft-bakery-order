@@ -53,10 +53,10 @@ graph TD
         PrismaSingleton["Prisma Client Singleton (lib/db.ts)"]
     end
 
-    subgraph PersistenceLayer ["Persistence Layer"]
-        SQLiteEngine["SQLite Engine (better-sqlite3)"]
-        VolMount["External Persistent Storage (/app/data/crustcraft.db)"]
-        PG_Option["PostgreSQL Compatible (Schema Portability)"]
+    subgraph PersistenceLayer ["Persistence Layer (PostgreSQL 16 — Lab 5 Active)"]
+        PGEngine["PostgreSQL 16 Engine (Prisma ORM)"]
+        CloudSQL["GCP Cloud SQL (crustcraft-pg, 10GB SSD) / Local Docker postgres:16-alpine"]
+        CloudRun["GCP Cloud Run (crustcraft service + crustcraft-migrate job)"]
     end
 
     subgraph E2ETesting ["Automated Quality Assurance"]
@@ -72,9 +72,9 @@ graph TD
     RBACMW --> Controllers
     Controllers --> Services
     Services --> PrismaSingleton
-    PrismaSingleton --> SQLiteEngine
-    SQLiteEngine --> VolMount
-    SQLiteEngine -.-> PG_Option
+    PrismaSingleton --> PGEngine
+    PGEngine --> CloudSQL
+    CloudRun -.->|Runs Container & Migrations| CloudSQL
     Controllers --> JSON_Env
     JSON_Env --> API_Client
     Playwright -.->|E2E Verification| UI_Cust & UI_Op
@@ -111,8 +111,8 @@ graph TD
                                             | Prisma ORM (Engine)
 +-------------------------------------------v---------------------------------------------+
 |                               PERSISTENCE & STORAGE LAYER                               |
-|       Local / Cloud: SQLite File on Persistent Volume (/app/data/crustcraft.db)         |
-|       (Zero-drift schema ready for PostgreSQL 16 on GCP Cloud SQL / Docker Compose)     |
+|       Prod: GCP Cloud SQL for PostgreSQL 16 (crustcraft-pg via Unix Socket / Cloud Run) |
+|       Local / CI: Docker Compose postgres:16-alpine with named persistent volume        |
 +-----------------------------------------------------------------------------------------+
 ```
 
@@ -236,9 +236,9 @@ erDiagram
 ```
 
 ### 4.2 Seeded Baseline Data Specifications
-The baseline migration initializes with reproducible synthetic records:
-- **Operator Account:** `operator@crustcraft.com` (Role: `OPERATOR`, Password: `operator123`).
-- **Customer Accounts:** `customer1@test.com` and `customer2@test.com` (Role: `CUSTOMER`, Password: `customer123`).
+The idempotent seed script (`prisma/seed.ts`) initializes reproducible synthetic accounts and menu items (no sample orders are seeded; passwords are injected via `ADMIN_PASSWORD` and `DEMO_USER_PASSWORD` environment variables / GCP Secret Manager, never committed in plaintext):
+- **Operator Account:** `admin@crustcraft.com` (Name: `Head Baker Admin`, Role: `OPERATOR`, Password: `${ADMIN_PASSWORD}`).
+- **Demo Customer Accounts (`SEED_DEMO_DATA !== 'false'`):** `customer1@test.com` and `customer2@test.com` (Role: `CUSTOMER`, Password: `${DEMO_USER_PASSWORD}`).
 - **Standard Bakery Catalog:**
   1. *Artisan Butter Croissant:* Category `Pastry`, Price `8500` satang (฿85.00), Initial Stock `50`, `isAvailable: true`.
   2. *Classic Sourdough Loaf:* Category `Bread`, Price `22000` satang (฿220.00), Initial Stock `20`, `isAvailable: true`.

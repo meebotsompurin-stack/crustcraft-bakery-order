@@ -180,7 +180,7 @@ The following matrix defines conceptual operational privileges across user roles
 
 ### 7.1 Technical Constraints
 1. **Academic Framework Constraints:** Project development is bounded by the KMUTT CPE 334 semester schedule, mandating three incremental deliverables (Deliverable 1 due 8 Nov 2026, Deliverable 2 due 29 Nov 2026, Final Delivery due 13 Dec 2026) alongside three group labs (Lab 5 GCP/Docker, Lab 6 UAT, Lab 7 Maintenance).
-2. **Modular Monolith Stack:** Single unified repository with distinct layers: Express.js (TypeScript) backend in `server/`, React (Vite + TypeScript + Tailwind CSS) in `client/`, Prisma ORM with SQLite (local) / PostgreSQL (production capability) in `prisma/`, and Playwright in `e2e/`.
+2. **Modular Monolith Stack:** Single unified repository with distinct layers: Express.js (TypeScript) backend in `server/`, React (Vite + TypeScript + Tailwind CSS) in `client/`, Prisma ORM with PostgreSQL 16 (`postgres:16-alpine` locally/CI and GCP Cloud SQL in production — migrated from Sprint 1 SQLite in Lab 5) in `prisma/`, and Playwright in `e2e/`.
 
 ### 7.2 Architectural Assumptions & Resolutions
 - **Currency Assumption:** All business operations occur in Thailand; currency is Thai Baht (THB). Storing prices in integer satang (`Int`) eliminates fractional cent ambiguities.

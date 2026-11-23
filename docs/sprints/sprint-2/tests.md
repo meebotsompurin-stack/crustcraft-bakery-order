@@ -65,6 +65,9 @@
 
 ### 2.4 Playwright Multi-Viewport E2E & Continuity Suite (`E2E-S2-01` to `E2E-S2-06` — `S2-ISSUE-05` / `#65`)
 
+> **Playwright Config Prerequisite (`e2e/playwright.config.ts`):** Update `testDir` from `./sprint-1` so both `e2e/sprint-1/` and `e2e/sprint-2/` execute, and replace the legacy SQLite `file:./dev.db` fallback with PostgreSQL `DATABASE_URL`.  
+> **Two-Stage Release Alignment:** `E2E-S2-01`..`04` and `E2E-S2-06` verify Release 1 (**`v2.0.0-sprint2`**); `E2E-S2-05` (`F-08` reporting) + full regression verify Release 2 (**`v2.1.0-s3-progress`**).
+
 | Test ID | Type | AC Reference | Scenario (Desktop 1280px, Tablet 768px, Mobile 375px) | Test File | Status |
 |---|---|---|---|---|:---:|
 | **E2E-S2-01** | Playwright E2E | `AC-S2-F05-08` | Operator creates a new bakery item, restocks it, and toggles availability on `/operator/catalog`; customer sees/cannot see it accordingly. | `e2e/sprint-2/catalog-admin.spec.ts` | ⬜ |

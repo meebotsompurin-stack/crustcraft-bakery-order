@@ -20,7 +20,7 @@
 | Page / Component | Route | Allowed Role | Feature | Summary |
 |---|---|:---:|:---:|---|
 | `OperatorCatalogPage` *(New)* | `/operator/catalog` | `OPERATOR` | `F-05` | Manage all catalog items (active & archived), create new item, edit price/details, restock `stockQuantity`, toggle `isAvailable`. |
-| `OperatorOrderQueuePage` *(Updated)* | `/operator/orders` | `OPERATOR` | `F-06`, `F-07` | Show full 6-status badges, `PaymentStatusBadge`, and contextual next-step action button (`Accept`, `Start Baking`, `Mark Ready`, `Complete`). |
+| `OperatorOrderQueuePage` + `OperatorOrderRow` *(Updated)* | `/operator/orders` | `OPERATOR` | `F-06`, `F-07` | Show full 6-status badges, `PaymentStatusBadge`, and contextual next-step action button (`Accept`, `Start Baking`, `Mark Ready`, `Complete`) rendered per row in `OperatorOrderRow.tsx`. |
 | `OperatorOrderDetailPage` *(Updated)* | `/operator/orders/:id` | `OPERATOR` | `F-06`, `F-07` | Full fulfillment stepper/buttons + Cancel button (when `PENDING`) + `SimulatedPaymentCard` (operator counter settlement toggle). |
 | `MyOrdersPage` *(Updated)* | `/orders` | `CUSTOMER` | `F-06`, `F-07` | Display updated status badges (`PENDING`..`COMPLETED`/`CANCELLED`) and `PaymentStatusBadge` per order. |
 | `OrderDetailPage` *(Updated)* | `/orders/:id` | `CUSTOMER` | `F-06`, `F-07` | Show order progress timeline, **Cancel Order** button (visible only when `status === "PENDING"`), and `SimulatedPaymentCard` (when not `CANCELLED`). |
@@ -56,5 +56,6 @@
 - **Customer Cancel Flow (`OrderDetailPage.tsx`):**
   - `"Cancel Order"` button renders strictly when `status === "PENDING"`.
   - Clicking triggers confirmation prompt, calls `PATCH /api/customer/orders/:id/cancel`, updates status badge to `CANCELLED`, and displays confirmation message noting inventory was restored.
-- **Operator Progression Flow (`OperatorOrderDetailPage.tsx`):**
+- **Operator Progression Flow (`OperatorOrderRow.tsx` & `OperatorOrderDetailPage.tsx`):**
   - Displays single deterministic next-step CTA based on current status (`Accept Order` → `Start Baking` → `Mark Ready for Pickup` → `Mark Completed`) plus `"Cancel Order"` button when `status === "PENDING"`.
+  - `OperatorOrderRow.tsx` renders each queue item's 6-state status badge, `PaymentStatusBadge`, and inline next-step button without breaking mobile/tablet wrapping.

@@ -106,10 +106,13 @@ model Order {
 
   @@index([customerId])
   @@index([status, createdAt])
+  @@index([paymentStatus])
 }
 ```
 
 - **No changes to `User`, `BakeryItem`, or `OrderItem` tables:** `BakeryItem` already includes `name`, `description`, `price`, `stockQuantity`, `isAvailable`, and `category` required by `F-05`.
+- **Index Alignment:** `@@index([paymentStatus])` is included in the Sprint 2 migration so Sprint 3 `F-08` (reporting payment breakdown) and `F-09` (`?paymentStatus=` filter) queries run against an indexed column.
+- **Seed Scope (`prisma/seed.ts`):** `prisma/seed.ts` remains **unchanged** (no sample orders seeded — preserves idempotent, non-destructive seeding of Users & 5 `BakeryItem` records on Cloud SQL; automated test suites create isolated order fixtures per test run).
 - **Migration Safety:** Adding `paymentStatus TEXT NOT NULL DEFAULT 'UNPAID'` cleanly backfills all existing orders on Cloud SQL without data loss or downtime.
 
 ---
@@ -147,4 +150,4 @@ model Order {
 * [ ] All Sprint 2 AC (`AC-S2-F05-01`..`08`, `AC-S2-F06-01`..`05`, `AC-S2-F07-01`..`05`) implemented and verified by passing automated tests (TDD Red → Green preserved in Git history).
 * [ ] Zero regressions in Sprint 1 (44 tests) and Lab 6 (`#58` `pickupNote` 500-char tests).
 * [ ] Every feature PR passes CI (`test-and-docker`) and receives substantive peer review from the teammate.
-* [ ] Integrated release candidate deployed on GCP Cloud Run via repeatable pipeline and verified post-deployment.
+* [ ] Standalone Sprint 2 increment tagged **`v2.0.0-sprint2`** on `main` (Deliverable 2 Part B), followed by the integrated Deliverable 2 candidate (`F-08` + updated traceability/readiness) tagged **`v2.1.0-s3-progress`**, deployed on GCP Cloud Run via repeatable pipeline, and verified post-deployment.
