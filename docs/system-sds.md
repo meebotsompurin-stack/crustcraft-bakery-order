@@ -2,7 +2,7 @@
 
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
-> **Document Version:** `1.0.0` (Sprint 1 Engineering Baseline)  
+> **Document Version:** `2.0.0` (Sprint 2 Baseline Sync — updated for Lab 5 PostgreSQL 16 / Cloud Run / WIF CI/CD and Sprint 2 `Order.paymentStatus`)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
@@ -219,8 +219,9 @@ erDiagram
         String id PK "cuid / uuid"
         String customerId FK "References User.id"
         OrderStatus status "PENDING | ACCEPTED | BAKING | READY_FOR_PICKUP | COMPLETED | CANCELLED"
+        PaymentStatus paymentStatus "UNPAID | PAID | FAILED (Added Sprint 2 — F-07)"
         Int totalAmount "Authoritative order sum in SATANG"
-        String pickupNote "Optional customer instructions"
+        String pickupNote "Optional customer instructions (max 500 chars, Lab 6 #58)"
         DateTime createdAt "Order placement timestamp"
         DateTime updatedAt "Order status change timestamp"
     }
@@ -253,7 +254,7 @@ The baseline migration initializes with reproducible synthetic records:
 |---|---|---|
 | **Backend Framework** | Node.js + Express.js (TypeScript) | Proven, lightweight runtime with extensive ecosystem. TypeScript enforces compile-time type safety across API boundaries, contracts, and ORM entity models. |
 | **Object-Relational Mapping** | Prisma ORM | Provides automated schema migrations, strictly typed database queries, built-in connection management, and seamless transactional primitives (`prisma.$transaction`). |
-| **Database Engine** | SQLite (Dev/Local) & SQLite on Persistent Volume / PostgreSQL (Prod) | SQLite requires zero background daemon configuration, enabling rapid local development and test suite isolation. The relational schema is completely portable to PostgreSQL for enterprise production. |
+| **Database Engine** | PostgreSQL 16 (`postgres:16-alpine` local/CI & GCP Cloud SQL in prod) | Migrated from Sprint 1 SQLite to managed PostgreSQL 16 in Lab 5 for durable serverless Cloud Run persistence, transactional row locking, and zero-drift CI/production parity. |
 | **Frontend Framework** | React 18 + Vite (TypeScript) | Declarative UI component hierarchy with instantaneous HMR (Hot Module Replacement) and optimized production bundle compilation. |
 | **Styling Framework** | Tailwind CSS | Utility-first styling eliminating external CSS bloat and preventing style regressions. Directly supports mobile-first responsive breakpoints (`sm:`, `md:`, `lg:`). |
 | **API & Integration Testing** | Vitest + Supertest | Blazing fast test runner with native TypeScript and ESM compatibility. Supertest facilitates comprehensive HTTP assertion of routes, middleware, and database mutations. |
@@ -263,13 +264,13 @@ The baseline migration initializes with reproducible synthetic records:
 
 ## 6. Architecture Decision Records (ADRs)
 
-### ADR-01: GCP Data Persistence & Migration Strategy (Spec 5.1 Compliance)
-- **Status:** Accepted
+### ADR-01: GCP Data Persistence & Migration Strategy (Spec 5.1 Compliance — Updated Lab 5)
+- **Status:** Accepted (Supersedes Sprint 1 SQLite Volume Plan)
 - **Context:** Course Specification Section 5.1 mandates that all persisted application data must survive container restarts, application rebuilds, and cloud redeployments on GCP without data loss.
 - **Decision:**
-  1. **Primary Cloud Deployment Plan:** Run the containerized CrustCraft application with SQLite, mounting the database file to an external persistent storage volume (`/app/data/crustcraft.db`) provisioned via GCP Compute Engine Persistent Disk or Google Cloud Run Gen2 Persistent Volume Mount.
-  2. **Zero-Drift PostgreSQL Portability:** Model all Prisma schema fields using universal relational data types (`String`, `Int`, `Boolean`, `DateTime`). Provide a production-ready `docker-compose.yml` configured with `postgres:16-alpine` and an external named volume (`pgdata`), allowing an instantaneous one-line switch to managed PostgreSQL (e.g., GCP Cloud SQL) should the deployment environment necessitate an external database server.
-- **Consequences:** Eliminates external database network latency during local development and testing while guaranteeing full compliance with course persistence rubrics.
+  1. **Sprint 1 Baseline (Historical):** Started with SQLite (`provider = "sqlite"`) using PostgreSQL-portable schema types for rapid zero-config local setup.
+  2. **Lab 5 Production Implementation (Active):** Upgraded Prisma `provider = "postgresql"` backed by **GCP Cloud SQL for PostgreSQL 16 (`db-f1-micro`, Enterprise Edition, 10GB SSD)** connected over Cloud SQL Unix sockets from **Google Cloud Run** (`crustcraft` service + `crustcraft-migrate` job running `prisma migrate deploy` + idempotent seed before traffic cutover), with **GitHub Actions WIF** keyless deployment and local/CI parity via `postgres:16-alpine`.
+- **Consequences:** Full ACID durability surviving container restarts, image redeployments, and rollbacks on Cloud Run without relying on ephemeral container disks.
 
 ### ADR-02: Dual-Channel JWT Authentication, 24h Expiry & Session Revocation
 - **Status:** Accepted
