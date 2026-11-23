@@ -2,7 +2,7 @@
 
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
-> **Document Version:** `1.0.0` (Sprint 1 Engineering Baseline)  
+> **Document Version:** `2.0.0` (Sprint 2 Baseline Sync — updated for Lab 5 PostgreSQL 16 / Cloud Run / WIF CI/CD and Sprint 2 `Order.paymentStatus`)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
@@ -53,10 +53,10 @@ graph TD
         PrismaSingleton["Prisma Client Singleton (lib/db.ts)"]
     end
 
-    subgraph PersistenceLayer ["Persistence Layer"]
-        SQLiteEngine["SQLite Engine (better-sqlite3)"]
-        VolMount["External Persistent Storage (/app/data/crustcraft.db)"]
-        PG_Option["PostgreSQL Compatible (Schema Portability)"]
+    subgraph PersistenceLayer ["Persistence Layer (PostgreSQL 16 — Lab 5 Active)"]
+        PGEngine["PostgreSQL 16 Engine (Prisma ORM)"]
+        CloudSQL["GCP Cloud SQL (crustcraft-pg, 10GB SSD) / Local Docker postgres:16-alpine"]
+        CloudRun["GCP Cloud Run (crustcraft service + crustcraft-migrate job)"]
     end
 
     subgraph E2ETesting ["Automated Quality Assurance"]
@@ -72,9 +72,9 @@ graph TD
     RBACMW --> Controllers
     Controllers --> Services
     Services --> PrismaSingleton
-    PrismaSingleton --> SQLiteEngine
-    SQLiteEngine --> VolMount
-    SQLiteEngine -.-> PG_Option
+    PrismaSingleton --> PGEngine
+    PGEngine --> CloudSQL
+    CloudRun -.->|Runs Container & Migrations| CloudSQL
     Controllers --> JSON_Env
     JSON_Env --> API_Client
     Playwright -.->|E2E Verification| UI_Cust & UI_Op
@@ -111,8 +111,8 @@ graph TD
                                             | Prisma ORM (Engine)
 +-------------------------------------------v---------------------------------------------+
 |                               PERSISTENCE & STORAGE LAYER                               |
-|       Local / Cloud: SQLite File on Persistent Volume (/app/data/crustcraft.db)         |
-|       (Zero-drift schema ready for PostgreSQL 16 on GCP Cloud SQL / Docker Compose)     |
+|       Prod: GCP Cloud SQL for PostgreSQL 16 (crustcraft-pg via Unix Socket / Cloud Run) |
+|       Local / CI: Docker Compose postgres:16-alpine with named persistent volume        |
 +-----------------------------------------------------------------------------------------+
 ```
 
@@ -219,8 +219,9 @@ erDiagram
         String id PK "cuid / uuid"
         String customerId FK "References User.id"
         OrderStatus status "PENDING | ACCEPTED | BAKING | READY_FOR_PICKUP | COMPLETED | CANCELLED"
+        PaymentStatus paymentStatus "UNPAID | PAID | FAILED (Added Sprint 2 — F-07)"
         Int totalAmount "Authoritative order sum in SATANG"
-        String pickupNote "Optional customer instructions"
+        String pickupNote "Optional customer instructions (max 500 chars, Lab 6 #58)"
         DateTime createdAt "Order placement timestamp"
         DateTime updatedAt "Order status change timestamp"
     }
@@ -235,9 +236,9 @@ erDiagram
 ```
 
 ### 4.2 Seeded Baseline Data Specifications
-The baseline migration initializes with reproducible synthetic records:
-- **Operator Account:** `operator@crustcraft.com` (Role: `OPERATOR`, Password: `operator123`).
-- **Customer Accounts:** `customer1@test.com` and `customer2@test.com` (Role: `CUSTOMER`, Password: `customer123`).
+The idempotent seed script (`prisma/seed.ts`) initializes reproducible synthetic accounts and menu items (no sample orders are seeded; passwords are injected via `ADMIN_PASSWORD` and `DEMO_USER_PASSWORD` environment variables / GCP Secret Manager, never committed in plaintext):
+- **Operator Account:** `admin@crustcraft.com` (Name: `Head Baker Admin`, Role: `OPERATOR`, Password: `${ADMIN_PASSWORD}`).
+- **Demo Customer Accounts (`SEED_DEMO_DATA !== 'false'`):** `customer1@test.com` and `customer2@test.com` (Role: `CUSTOMER`, Password: `${DEMO_USER_PASSWORD}`).
 - **Standard Bakery Catalog:**
   1. *Artisan Butter Croissant:* Category `Pastry`, Price `8500` satang (฿85.00), Initial Stock `50`, `isAvailable: true`.
   2. *Classic Sourdough Loaf:* Category `Bread`, Price `22000` satang (฿220.00), Initial Stock `20`, `isAvailable: true`.
@@ -253,7 +254,7 @@ The baseline migration initializes with reproducible synthetic records:
 |---|---|---|
 | **Backend Framework** | Node.js + Express.js (TypeScript) | Proven, lightweight runtime with extensive ecosystem. TypeScript enforces compile-time type safety across API boundaries, contracts, and ORM entity models. |
 | **Object-Relational Mapping** | Prisma ORM | Provides automated schema migrations, strictly typed database queries, built-in connection management, and seamless transactional primitives (`prisma.$transaction`). |
-| **Database Engine** | SQLite (Dev/Local) & SQLite on Persistent Volume / PostgreSQL (Prod) | SQLite requires zero background daemon configuration, enabling rapid local development and test suite isolation. The relational schema is completely portable to PostgreSQL for enterprise production. |
+| **Database Engine** | PostgreSQL 16 (`postgres:16-alpine` local/CI & GCP Cloud SQL in prod) | Migrated from Sprint 1 SQLite to managed PostgreSQL 16 in Lab 5 for durable serverless Cloud Run persistence, transactional row locking, and zero-drift CI/production parity. |
 | **Frontend Framework** | React 18 + Vite (TypeScript) | Declarative UI component hierarchy with instantaneous HMR (Hot Module Replacement) and optimized production bundle compilation. |
 | **Styling Framework** | Tailwind CSS | Utility-first styling eliminating external CSS bloat and preventing style regressions. Directly supports mobile-first responsive breakpoints (`sm:`, `md:`, `lg:`). |
 | **API & Integration Testing** | Vitest + Supertest | Blazing fast test runner with native TypeScript and ESM compatibility. Supertest facilitates comprehensive HTTP assertion of routes, middleware, and database mutations. |
@@ -263,13 +264,13 @@ The baseline migration initializes with reproducible synthetic records:
 
 ## 6. Architecture Decision Records (ADRs)
 
-### ADR-01: GCP Data Persistence & Migration Strategy (Spec 5.1 Compliance)
-- **Status:** Accepted
+### ADR-01: GCP Data Persistence & Migration Strategy (Spec 5.1 Compliance — Updated Lab 5)
+- **Status:** Accepted (Supersedes Sprint 1 SQLite Volume Plan)
 - **Context:** Course Specification Section 5.1 mandates that all persisted application data must survive container restarts, application rebuilds, and cloud redeployments on GCP without data loss.
 - **Decision:**
-  1. **Primary Cloud Deployment Plan:** Run the containerized CrustCraft application with SQLite, mounting the database file to an external persistent storage volume (`/app/data/crustcraft.db`) provisioned via GCP Compute Engine Persistent Disk or Google Cloud Run Gen2 Persistent Volume Mount.
-  2. **Zero-Drift PostgreSQL Portability:** Model all Prisma schema fields using universal relational data types (`String`, `Int`, `Boolean`, `DateTime`). Provide a production-ready `docker-compose.yml` configured with `postgres:16-alpine` and an external named volume (`pgdata`), allowing an instantaneous one-line switch to managed PostgreSQL (e.g., GCP Cloud SQL) should the deployment environment necessitate an external database server.
-- **Consequences:** Eliminates external database network latency during local development and testing while guaranteeing full compliance with course persistence rubrics.
+  1. **Sprint 1 Baseline (Historical):** Started with SQLite (`provider = "sqlite"`) using PostgreSQL-portable schema types for rapid zero-config local setup.
+  2. **Lab 5 Production Implementation (Active):** Upgraded Prisma `provider = "postgresql"` backed by **GCP Cloud SQL for PostgreSQL 16 (`db-f1-micro`, Enterprise Edition, 10GB SSD)** connected over Cloud SQL Unix sockets from **Google Cloud Run** (`crustcraft` service + `crustcraft-migrate` job running `prisma migrate deploy` + idempotent seed before traffic cutover), with **GitHub Actions WIF** keyless deployment and local/CI parity via `postgres:16-alpine`.
+- **Consequences:** Full ACID durability surviving container restarts, image redeployments, and rollbacks on Cloud Run without relying on ephemeral container disks.
 
 ### ADR-02: Dual-Channel JWT Authentication, 24h Expiry & Session Revocation
 - **Status:** Accepted
