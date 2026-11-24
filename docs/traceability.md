@@ -2,10 +2,16 @@
 
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
-> **Document Version:** `1.0.0` (Sprint 1 Engineering Baseline)  
+> **Document Version:** `1.1.0` (Lab 7 `CR-01` Maintenance Revision — Pre-Implementation Contract Gate)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
+
+### Revision History
+| Version | Date | Issue / PR | Summary of Changes |
+|---|---|---|---|
+| `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial Requirements Traceability Matrix mapping `FR-01`–`FR-09`, `BR-01`–`BR-07`, and `NFR-01`–`NFR-06`. |
+| `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Added `CR-01` traceability for revised `BR-03` & `FR-03-01` (`AC-CR01-01`..`AC-CR01-06` → `CR01-01..06`, `CR01-UI-01..02`, `E2E-CR01-01`) and recorded intended revision of `ORD-08` (L429). |
 
 ---
 
@@ -14,9 +20,10 @@
 This document establishes bi-directional requirements traceability for the CrustCraft Artisan Bakery platform across all three development sprints. Every system-level Functional Requirement (`FR-XX`), Business Rule (`BR-XX`), and Non-Functional Requirement (`NFR-XX`) links directly to an implementing Feature (`F-XX`), an explicit Acceptance Criteria ID (`AC-XX`), and its corresponding automated verification test suite.
 
 ### Testing Level Legend
-- **Unit:** Isolated business logic and calculation tests via Vitest (`server/src/__tests__/unit/*.test.ts`).
-- **API / DB:** Full HTTP request-response and database persistence tests via Supertest and Vitest (`server/src/__tests__/sprint-1/*.api.test.ts`).
-- **E2E:** Browser-driven user journeys across three viewports (Desktop 1280px, Tablet 768px, Mobile 375px) via Playwright (`e2e/sprint-1/*.spec.ts`).
+- **Unit (Server):** Isolated business logic and calculation tests via Vitest (`server/src/__tests__/unit/*.test.ts`).
+- **Component UI (Client):** React component unit/DOM tests via Vitest + React Testing Library + `jsdom` (`client/src/components/__tests__/*.test.tsx`).
+- **API / DB:** Full HTTP request-response and database persistence tests via Supertest and Vitest (`server/src/__tests__/sprint-1/*.api.test.ts`, `server/src/__tests__/lab-7/*.api.test.ts`).
+- **E2E:** Browser-driven user journeys across three viewports (Desktop 1280px, Tablet 768px, Mobile 375px) via Playwright (`e2e/sprint-1/*.spec.ts`, `e2e/lab-7/*.spec.ts`).
 - **Architectural / Config:** Static code analysis, configuration assertion, or container lifecycle validation.
 
 ---
@@ -35,7 +42,7 @@ This document establishes bi-directional requirements traceability for the Crust
 | **FR-02-02** | Catalog payload schema (id, name, satang price, stock, category) | `F-02` | Sprint 1 | `AC-02-02` / `AC-04-02` | `CAT-02` | API Integration (`server/src/__tests__/sprint-1/catalog.api.test.ts`) |
 | **FR-02-03** | Single bakery item detail query by ID | `F-02` | Sprint 1 | `AC-04-04`, `AC-04-05` | `CAT-04`, `CAT-05` | API Integration (`server/src/__tests__/sprint-1/catalog.api.test.ts`) |
 | **FR-02-04** | Frontend catalog display in Thai Baht with out-of-stock badge | `F-02` | Sprint 1 | `AC-04-06` | `CAT-02`, `E2E-02` | UI Component & Playwright E2E (`e2e/sprint-1/customer-order-flow.spec.ts`) |
-| **FR-03-01** | Multi-item pre-order creation with optional pickup notes | `F-03` | Sprint 1 | `AC-03-01` / `AC-04-07` | `ORD-01`, `E2E-03` | API Integration & Playwright E2E (`e2e/sprint-1/customer-order-flow.spec.ts`) |
+| **FR-03-01** | Multi-item pre-order creation with `1 <= quantity <= 5` cap, unique `bakeryItemId`, and optional `pickupNote` (`<= 500` chars) *(revised v1.1.0 / `CR-01`)* | `F-03` | Sprint 1 / Lab 7 | `AC-03-01` / `AC-04-07`, `AC-CR01-01`..`AC-CR01-06` | `ORD-01`, `E2E-03`, `CR01-01`..`06`, `CR01-UI-01..02`, `E2E-CR01-01` | API Integration (`server/src/__tests__/sprint-1/orders.api.test.ts`, `server/src/__tests__/lab-7/order-quantity-cap.api.test.ts`), RTL (`client/src/components/__tests__/BakeryItemCard.test.tsx`), & Playwright E2E (`e2e/sprint-1/customer-order-flow.spec.ts`, `e2e/lab-7/order-quantity-cap.spec.ts`) |
 | **FR-03-02** | Server-side total calculation in integer satangs from DB prices | `F-03` | Sprint 1 | `AC-04-08` | `ORD-02` | Unit Calculation (`server/src/__tests__/unit/orderCalculation.test.ts`) |
 | **FR-03-03** | Unit price snapshotting into OrderItem records at creation time | `F-03` | Sprint 1 | `AC-03-02` / `AC-04-09` | `ORD-03`, `ORD-04` | Unit Calculation & API Integration (`server/src/__tests__/sprint-1/orders.api.test.ts`) |
 | **FR-03-04** | Atomic stock deduction within database transaction | `F-03` | Sprint 1 | `AC-03-03` / `AC-04-10`, `AC-04-11` | `ORD-04`, `ORD-05` | API Integration (`server/src/__tests__/sprint-1/orders.api.test.ts`) |
@@ -56,7 +63,7 @@ This document establishes bi-directional requirements traceability for the Crust
 | **FR-09-02** | Maintenance change execution and regression hardening (Lab 7) | `F-09` | Sprint 3 | `AC-S3-F09-02` | `REGRESS-01`, `REGRESS-02` | Regression Test Suite (`e2e/regression/*.spec.ts`) |
 | **BR-01** | Authoritative server-side pricing in integer satang | `F-03` | Sprint 1 | `AC-04-08` | `ORD-02` | Unit Calculation (`server/src/__tests__/unit/orderCalculation.test.ts`) |
 | **BR-02** | Historical unit price snapshotting on OrderItem | `F-03` | Sprint 1 | `AC-03-02` / `AC-04-09` | `ORD-03` | Unit Calculation (`server/src/__tests__/unit/orderCalculation.test.ts`) |
-| **BR-03** | Stock validation and transactional atomicity (`prisma.$transaction`) | `F-03` | Sprint 1 | `AC-03-03` / `AC-04-10`, `AC-04-11` | `ORD-04`, `ORD-05` | API Integration (`server/src/__tests__/sprint-1/orders.api.test.ts`) |
+| **BR-03** | Per-item quantity cap (`1 <= quantity <= 5`), duplicate `bakeryItemId` `400` guard, `400`-before-`409` precedence, stock validation & transactional atomicity (`prisma.$transaction`) *(revised v1.1.0 / `CR-01`)* | `F-03` | Sprint 1 / Lab 7 | `AC-03-03` / `AC-04-10`, `AC-04-11`, `AC-CR01-01`..`AC-CR01-06` | `ORD-04`, `ORD-05`, `ORD-08` *(intended update)*, `CR01-01`..`06`, `CR01-UI-01..02`, `E2E-CR01-01` | API Integration (`orders.api.test.ts`, `lab-7/order-quantity-cap.api.test.ts`), RTL (`BakeryItemCard.test.tsx`), & Playwright E2E (`e2e/lab-7/order-quantity-cap.spec.ts`) |
 | **BR-04** | Customer data isolation (cross-customer access returns 403) | `F-03` | Sprint 1 | `AC-03-06` / `AC-04-17` | `ORD-11` | API Integration (`server/src/__tests__/sprint-1/orders.api.test.ts`) |
 | **BR-05** | `isAvailable` vs. `stockQuantity` separation (stock 0 remains in catalog as Out of Stock, orders return 409) | `F-02`, `F-03` | Sprint 1 | `AC-04-01`, `AC-04-13`, `AC-04-14` | `CAT-01`, `CAT-03`, `ORD-07`, `ORD-08` | API Integration (`server/src/__tests__/sprint-1/catalog.api.test.ts`, `orders.api.test.ts`) |
 | **BR-06** | Shared global operator queue for single bakery operations | `F-04` | Sprint 1 | `AC-05-02` | `OPS-02` | API Integration (`server/src/__tests__/sprint-1/operator.api.test.ts`) |
@@ -70,14 +77,28 @@ This document establishes bi-directional requirements traceability for the Crust
 
 ---
 
+## 2.1 Lab 7 Maintenance Change Traceability (`CR-01`: `BR-03` / `FR-03-01` Max 5 Per-Item Cap)
+
+| CR AC ID | Linked Rule / Req | TA Condition | Summary Description | Test ID(s) | Verification Level & Target File |
+|---|---|---|---|---|---|
+| **AC-CR01-01** | `BR-03`, `FR-03-01` | Core `CR-01` | Boundary allowed (`quantity: 5` → `201 Created`, stock decremented by 5) and exceeded (`quantity: 6` → `400 VALIDATION_ERROR`, `details[0].field === "items[0].quantity"`, zero stock deducted, no order persisted) | `CR01-01`, `CR01-02` | API Integration (`server/src/__tests__/lab-7/order-quantity-cap.api.test.ts`) |
+| **AC-CR01-02** | `BR-03`, `FR-03-01` | TA Condition #2 | Multi-item payload (`items[0].quantity: 2`, `items[1].quantity: 6`) fails with `400 VALIDATION_ERROR` and exact indexed `details[0].field === "items[1].quantity"`, with zero stock deducted for either item | `CR01-03` | API Integration (`server/src/__tests__/lab-7/order-quantity-cap.api.test.ts`) |
+| **AC-CR01-03** | `BR-03`, `BR-05`, `FR-03-01` | TA Conditions #2 & #3 | Stock < 5 (`quantity: 5`, `stockQuantity: 3`) still returns `409 CONFLICT` (`CR01-04`, `ORD-08` updated L429); simultaneous `quantity > 5` and `quantity > stockQuantity` (`quantity: 6`, `stockQuantity: 3`) returns `400 VALIDATION_ERROR` **before** `409 CONFLICT` (`CR01-06`) | `CR01-04`, `CR01-06`, `ORD-08` *(intended update)* | API Integration (`server/src/__tests__/lab-7/order-quantity-cap.api.test.ts`, `server/src/__tests__/sprint-1/orders.api.test.ts`) |
+| **AC-CR01-04** | `BR-03`, `FR-03-01` | TA Condition #1 | Duplicate `bakeryItemId` entries in `items[]` (e.g., two rows of `quantity: 5` for the same item) are rejected with `400 VALIDATION_ERROR` (`details[0].field === "items[1].bakeryItemId"`) before transaction execution, deducting zero stock | `CR01-05` | API Integration (`server/src/__tests__/lab-7/order-quantity-cap.api.test.ts`) |
+| **AC-CR01-05** | `FR-03-01` | TA Condition #3 | Frontend `BakeryItemCard` caps `+` at `Math.min(item.stockQuantity, 5)` (and `OrderPage.handleQuantityChange` clamps to `[0, Math.min(stockQuantity, 5)]`) and displays `"Max 5 per item"` notice | `CR01-UI-01`, `CR01-UI-02` | Client Component RTL (`client/src/components/__tests__/BakeryItemCard.test.tsx`) |
+| **AC-CR01-06** | `BR-03`, `FR-03-01`, `NFR-04` | TA Condition #3 | End-to-end browser verification across viewports: `+` button disables at 5, `"Max 5 per item"` notice is visible, and submitting a `quantity: 5` pre-order succeeds (`201`) | `E2E-CR01-01` | Playwright E2E (`e2e/lab-7/order-quantity-cap.spec.ts`) |
+
+---
+
 ## 3. Bi-Directional Coverage Verification Summary
 
 - **Total Baseline Requirements Mapped:**
   - Functional Requirements: 21 (`FR-01-01` through `FR-09-02`)
-  - Business Rules: 7 (`BR-01` through `BR-07`)
+  - Business Rules: 7 (`BR-01` through `BR-07`, with `BR-03` revised in v1.1.0 for Lab 7 `CR-01`)
   - Non-Functional Requirements: 6 (`NFR-01` through `NFR-06`)
 - **Coverage Distribution:**
   - Sprint 1 (Deliverable 1 Baseline): 100% of `FR-01` to `FR-04`, `BR-01` to `BR-07`, and `NFR-01` to `NFR-06` mapped to executable test suites (`AUTH-01`–`AUTH-10`, `CAT-01`–`CAT-05`, `ORD-01`–`ORD-12`, `OPS-01`–`OPS-08`, and `E2E-01`–`E2E-09`).
+  - Lab 7 Maintenance (`CR-01` / `#74`–`#75`): 100% of `AC-CR01-01` through `AC-CR01-06` mapped to 9 new automated tests (`CR01-01`..`CR01-06`, `CR01-UI-01`..`CR01-UI-02`, `E2E-CR01-01`) plus 1 versioned intended test update (`ORD-08` L429).
   - Sprint 2 (Core Expansion): 100% of `FR-05` to `FR-07` allocated to planned `ADM-XX`, `FUL-XX`, and `PAY-XX` suites.
   - Sprint 3 (Final Delivery): 100% of `FR-08` to `FR-09` allocated to planned `RPT-XX`, `SRCH-XX`, and `REGRESS-XX` suites.
 - **Orphan / Gap Count:** 0 (Zero orphan requirements; zero unmapped Acceptance Criteria).
