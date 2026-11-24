@@ -2,10 +2,16 @@
 
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
-> **Document Version:** `1.0.0` (Sprint 1 Engineering Baseline)  
+> **Document Version:** `1.1.0` (Lab 7 `CR-01` Maintenance Revision — Pre-Implementation Contract Gate)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
+
+### Revision History
+| Version | Date | Issue / PR | Summary of Changes |
+|---|---|---|---|
+| `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial System SDS covering Modular Monolith architecture, security protocol, ER model, tech stack, and `ADR-01`–`ADR-05`. |
+| `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Updated Request Lifecycle (§3.1) and ER model annotation (§4.1) for pre-transaction `1 <= quantity <= 5` cap, duplicate `bakeryItemId` `400` rejection, `400`-before-`409` precedence, and added `ADR-06`. Zero Prisma schema/migration changes. |
 
 ---
 
@@ -166,15 +172,20 @@ crustcraft-bakery-order/
    - If valid, the user identity is attached to `req.user = { userId: string, role: Role }`. If invalid or expired, the request is terminated with `401 UNAUTHORIZED`.
 4. **Authorization Guard (`requireRole.middleware.ts`):**
    - Endpoints requiring specific privileges apply `requireRole(['OPERATOR'])`. If `req.user.role` does not match, execution halts with `403 FORBIDDEN`.
-5. **Business Logic & Persistence:** The controller invokes the appropriate service. For mutating transactions (e.g., pre-order placement), the service wraps operations in `prisma.$transaction`.
-6. **Error Envelope Normalization:** If validation fails or a business conflict occurs, the server responds using the mandatory standard error format:
+5. **Pre-Transaction Domain Validation & Persistence (`CR-01` / `BR-03`):** The controller invokes the appropriate service. For `POST /api/customer/orders`, `orders.service.ts::createCustomerOrder()` executes all input and domain validation **before** opening `prisma.$transaction`:
+   - Non-empty `items[]`, valid `pickupNote` (`<= 500` chars per Lab 6 `#58`), and valid non-null item objects.
+   - Unique `bakeryItemId` enforcement (`seenItemIds` set): duplicate entries in `items[]` fail immediately with `400 VALIDATION_ERROR` (`details[0].field === "items[<index>].bakeryItemId"`).
+   - Quantity bounds enforcement (`1 <= quantity <= 5`, `MAX_QUANTITY_PER_ITEM = 5`): `quantity <= 0` or `quantity > 5` fails immediately with `400 VALIDATION_ERROR` (`details[0].field === "items[<index>].quantity"`).
+   - **Precedence (`400` before `409`):** Input/domain validation completes before DB lookup, guaranteeing `400 VALIDATION_ERROR` precedes `409 CONFLICT` whenever `quantity > 5` and `quantity > stockQuantity` occur simultaneously.
+   - Only after pre-transaction validation passes does the service open `prisma.$transaction` to verify existence (`404`), `isAvailable` (`409`), stock sufficiency (`409`), atomic stock deduction, and `Order`/`OrderItem` persistence.
+6. **Error Envelope Normalization:** If validation fails or a business conflict occurs, the server responds using the mandatory standard error format (including indexed `details[].field` paths such as `items[0].quantity` or `items[1].bakeryItemId` for array validation errors):
    ```json
    {
      "error": {
-       "code": "CONFLICT",
-       "message": "Requested item is out of stock.",
+       "code": "VALIDATION_ERROR",
+       "message": "Maximum order quantity is 5 units per item per order.",
        "details": [
-         { "field": "items", "issue": "Insufficient stock for Classic Sourdough Loaf" }
+         { "field": "items[0].quantity", "issue": "Quantity cannot exceed 5 per item per order" }
        ]
      }
    }
@@ -229,7 +240,7 @@ erDiagram
         String id PK "cuid / uuid"
         String orderId FK "References Order.id (Cascade Delete)"
         String bakeryItemId FK "References BakeryItem.id"
-        Int quantity "Number of units ordered (> 0)"
+        Int quantity "Number of units ordered (1..5 for new orders per CR-01; historical records preserved)"
         Int unitPriceAtOrder "Snapshot price in SATANG at order time"
     }
 ```
@@ -300,3 +311,13 @@ The baseline migration initializes with reproducible synthetic records:
 - **Context:** Boutique artisan bakeries operate with a single integrated kitchen and pickup counter. Workflows require all kitchen and counter staff to share complete visibility over all customer orders.
 - **Decision:** All accounts with role `OPERATOR` share a single, storewide global order queue. Orders are not partitioned by individual staff members. Any operator can inspect orders and execute valid state transitions.
 - **Consequences:** Aligns system design directly with the single-location artisan bakery domain model, simplifying queue synchronization while establishing robust authorization boundaries between customers and staff.
+
+### ADR-06: Per-Item Order Quantity Cap (`CR-01` / `BR-03` — `MAX_QUANTITY_PER_ITEM = 5`)
+- **Status:** Accepted (Lab 7 `CR-01`, Approved by TA Section 131 on 24 Nov 2026)
+- **Context:** Under the Sprint 1 baseline (`v1.0.0-sprint1`), `createCustomerOrder` checked only `quantity > 0` and `quantity <= stockQuantity`. A single customer could reserve an entire small-batch artisan baking yield (e.g., 50 croissants) in one pre-order, starving other customers.
+- **Decision:**
+  1. **Domain Constant & Pre-Transaction Enforcement:** Enforce `MAX_QUANTITY_PER_ITEM = 5` (`1 <= quantity <= 5`) inside `server/src/services/orders.service.ts::createCustomerOrder()` in the pre-transaction validation loop alongside the existing `seenItemIds` duplicate-item guard (`400 VALIDATION_ERROR` on duplicate `bakeryItemId`).
+  2. **Deterministic Error Precedence & Indexed Fields:** Because validation runs before `prisma.$transaction`, `400 VALIDATION_ERROR` strictly precedes `409 CONFLICT` when `quantity > 5` and `quantity > stockQuantity` occur together, and `details[0].field` reports exact array index (`items[<index>].quantity` or `items[<index>].bakeryItemId`).
+  3. **Client-Side Alignment:** `BakeryItemCard` caps `+` at `Math.min(item.stockQuantity, 5)` with a `"Max 5 per item"` notice, and `OrderPage` clamps `handleQuantityChange` to `[0, Math.min(stockQuantity, 5)]`.
+  4. **Zero Schema Migration & Historical Immutability:** No changes to `prisma/schema.prisma` or `prisma/migrations/`. Existing historical `OrderItem` records remain immutable and readable. All baseline invariants (`BR-01`, `BR-02`, `BR-03` atomicity, `BR-04`–`BR-07`, Lab 6 `#58`) remain intact.
+- **Consequences:** Protects daily artisan batch fairness with zero database migration risk to Cloud SQL PostgreSQL 16 and zero regression to existing order history or fulfillment workflows.
