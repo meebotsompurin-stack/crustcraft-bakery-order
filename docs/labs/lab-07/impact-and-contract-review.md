@@ -46,7 +46,7 @@
 ### 3.1 Callers & Dependencies
 - **Backend Call Chain:**
   - `server/src/routes/customer.routes.ts` → `authenticate` → `requireRole(['CUSTOMER'])` → `orders.controller.ts::createOrderHandler` → `orders.service.ts::createCustomerOrder`.
-  - `createOrderHandler` delegates all payload/domain validation to `createCustomerOrder` and forwards `AppError` instances to `error.middleware.ts`. Therefore, adding `MAX_QUANTITY_PER_ITEM = 5` inside `createCustomerOrder` automatically protects `POST /api/customer/orders` with zero controller or route signature changes.
+  - `createOrderHandler` delegates all payload/domain validation to `createCustomerOrder` and forwards `AppError` instances to the global Express error handler registered inline in `server/src/app.ts` (L80–L105). Therefore, adding `MAX_QUANTITY_PER_ITEM = 5` inside `createCustomerOrder` automatically protects `POST /api/customer/orders` with zero controller or route signature changes.
   - Pure calculation helpers (`calculateOrderTotals`, `snapshotItemPrices`) and read paths (`getCustomerOrders`, `getCustomerOrderById`, `operator.service.ts`) are **unaffected**.
 - **Frontend Call Chain:**
   - `OrderPage.tsx` fetches `getCatalogItemsApi()`, renders `BakeryItemCard` with `selectedQuantity` and `onQuantityChange`, and renders `OrderSummary` with `selectedLines`, `pickupNote`, and `handleOrderSubmit` (`createCustomerOrderApi`).
@@ -87,7 +87,7 @@
 An exhaustive audit of all existing test files under `server/src/__tests__/` and `e2e/sprint-1/` confirms:
 - **43 of 44 Sprint 1 tests + all Lab 6 `#58` tests:** Use valid quantities (`1`, `2`, `3`, or `<= 5`) or test non-quantity paths (`AUTH-*`, `CAT-*`, `OPS-*`, `E2E-01..09`). **Zero changes required.**
 - **1 Intended Test Update Identified (`ORD-08` in `server/src/__tests__/sprint-1/orders.api.test.ts`, Line 429 — TA Condition #3):**
-  - **Existing Code (L424–L434):** Sends `{ items: [{ bakeryItemId: itemInStockA, quantity: 20 }] }` against `itemInStockA` (`stockQuantity: 8`) expecting `409 CONFLICT` (`Insufficient stock`).
+  - **Existing Code (L424–L434):** Sends `{ items: [{ bakeryItemId: itemInStockA, quantity: 20 }] }` at L429 against `itemInStockA` (actual remaining stock `7` = `10 - 2 - 1` after the Lab 6 `#58` test at L389, even though the inline comment at L424 says `8`) expecting `409 CONFLICT` (`Insufficient stock`).
   - **Why It Conflicts with `CR-01`:** Under the approved `CR-01` rule and `400`-before-`409` precedence (TA Condition #2), `quantity: 20` exceeds `MAX_QUANTITY_PER_ITEM = 5` and will now be rejected with `400 VALIDATION_ERROR` before reaching the `409 CONFLICT` stock check.
   - **Documented Intended Update (Deferred to `LAB7-ISSUE-02` `#75` Commit 2):** Update `ORD-08` sub-case 2 to target an item with low stock (e.g., `stockQuantity: 3`) and request a valid per-item quantity `<= 5` that still exceeds stock (e.g., `quantity: 5`, or `quantity: 4`), preserving the exact `409 CONFLICT` + `"Insufficient stock"` assertion without weakening test coverage.
 
