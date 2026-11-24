@@ -291,3 +291,53 @@ export async function updateOperatorCatalogItemApi(
     body: JSON.stringify(payload),
   });
 }
+
+// -------------------------------------------------------------
+// F-08 Operator Sales & Order Summary Reporting API Client
+// -------------------------------------------------------------
+
+export interface TopSellingItemDto {
+  bakeryItemId: string;
+  name: string;
+  category: string;
+  quantitySold: number;
+  revenueSatang: number; // integer satang
+}
+
+export interface SalesSummaryDto {
+  totalRevenueSatang: number; // integer satang (COMPLETED orders only)
+  completedOrderCount: number;
+  totalOrderCount: number;
+  ordersByStatus: Record<OrderStatus, number>;
+  paymentBreakdown: Record<PaymentStatus, number>;
+  topSellingItems: TopSellingItemDto[];
+  dateRange: {
+    from: string | null;
+    to: string | null;
+  };
+}
+
+export interface SalesSummaryQueryParams {
+  from?: string;
+  to?: string;
+}
+
+export async function getOperatorSalesSummaryApi(
+  params?: SalesSummaryQueryParams
+): Promise<{ summary: SalesSummaryDto }> {
+  const searchParams = new URLSearchParams();
+  if (params?.from) {
+    searchParams.set('from', params.from);
+  }
+  if (params?.to) {
+    searchParams.set('to', params.to);
+  }
+  const queryString = searchParams.toString();
+  const path = queryString
+    ? `/operator/reports/summary?${queryString}`
+    : '/operator/reports/summary';
+
+  return requestJson<{ summary: SalesSummaryDto }>(path, {
+    method: 'GET',
+  });
+}

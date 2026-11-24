@@ -14,6 +14,7 @@ import { RegisterPage } from './pages/RegisterPage';
 import { OperatorOrderQueuePage } from './pages/OperatorOrderQueuePage';
 import { OperatorOrderDetailPage } from './pages/OperatorOrderDetailPage';
 import { OperatorCatalogPage } from './pages/OperatorCatalogPage';
+import { OperatorReportsPage } from './pages/OperatorReportsPage';
 import { CatalogPage } from './pages/CatalogPage';
 import { OrderPage } from './pages/OrderPage';
 import { MyOrdersPage } from './pages/MyOrdersPage';
@@ -64,6 +65,9 @@ const TopNavbar: React.FC = () => {
                 </Link>
                 <Link to="/operator/catalog" className="hover:text-amber-700">
                   Catalog Admin
+                </Link>
+                <Link to="/operator/reports" className="hover:text-amber-700">
+                  Sales Reports
                 </Link>
                 <Link to="/catalog" className="hover:text-amber-700">
                   Catalog View
@@ -178,6 +182,14 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['OPERATOR']}>
                     <OperatorCatalogPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/operator/reports"
+                element={
+                  <ProtectedRoute allowedRoles={['OPERATOR']}>
+                    <OperatorReportsPage />
                   </ProtectedRoute>
                 }
               />
