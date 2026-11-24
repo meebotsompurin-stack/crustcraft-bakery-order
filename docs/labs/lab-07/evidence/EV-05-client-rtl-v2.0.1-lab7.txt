@@ -1,0 +1,16 @@
+=== Client React Testing Library (jsdom) Verification on v2.0.1-lab7 ===
+Timestamp: 2026-11-24T23:52:28+07:00
+Commit SHA: b80a0d0492b9fa4cf3b9cfcb24a7455c2dfb9242 (tag v2.0.1-lab7)
+Command: npm run test --workspace=client
+
+> crustcraft-client@1.0.0 test
+> vitest run
+
+ RUN  v1.6.1 C:/KMUTT/SE/Project Bakery/client
+
+ ✓ src/components/__tests__/BakeryItemCard.test.tsx  (2 tests) 64ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2) (0 failed, 0 skipped)
+   Start at  23:52:28
+   Duration  1.52s (transform 81ms, setup 130ms, collect 194ms, tests 64ms, environment 572ms, prepare 110ms)
