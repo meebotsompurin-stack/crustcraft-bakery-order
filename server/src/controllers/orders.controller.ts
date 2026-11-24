@@ -3,6 +3,7 @@ import {
   createCustomerOrder,
   getCustomerOrders,
   getCustomerOrderById,
+  cancelCustomerOrder,
 } from '../services/orders.service';
 
 export async function createOrderHandler(
@@ -61,6 +62,21 @@ export async function getCustomerOrderByIdHandler(
     const customerId = req.user!.userId;
     const id = req.params.id as string;
     const order = await getCustomerOrderById(id, customerId);
+    res.status(200).json({ order });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function cancelCustomerOrderHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const customerId = req.user!.userId;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const order = await cancelCustomerOrder(id, customerId);
     res.status(200).json({ order });
   } catch (error) {
     next(error);

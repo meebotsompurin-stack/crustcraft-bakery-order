@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+const ADMIN_EMAIL = 'admin@crustcraft.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'supersecret_admin_pass';
+const CUSTOMER_PASSWORD = process.env.DEMO_USER_PASSWORD || 'supersecret_demo_pass';
+
 test.describe('Auth Guard & RBAC Protections (E2E-09)', () => {
   test('E2E-09: Unauthenticated access to protected routes redirects to /login', async ({ page }) => {
     // Ensure clean unauthenticated session
@@ -31,7 +35,7 @@ test.describe('Auth Guard & RBAC Protections (E2E-09)', () => {
     await page.context().clearCookies();
     await page.goto('/login');
     await page.fill('#email', 'customer1@test.com');
-    await page.fill('#password', 'customer123');
+    await page.fill('#password', CUSTOMER_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('/catalog');
 
@@ -44,8 +48,8 @@ test.describe('Auth Guard & RBAC Protections (E2E-09)', () => {
     // 2. Logout and login as OPERATOR
     await page.context().clearCookies();
     await page.goto('/login');
-    await page.fill('#email', 'operator@crustcraft.com');
-    await page.fill('#password', 'operator123');
+    await page.fill('#email', ADMIN_EMAIL);
+    await page.fill('#password', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('/operator/orders');
 

@@ -32,18 +32,20 @@ model BakeryItem {
 }
 
 model Order {
-  id          String      @id @default(cuid())
-  customerId  String
-  customer    User        @relation(fields: [customerId], references: [id])
-  status      String      @default("PENDING") // Sprint 1: "PENDING" | "ACCEPTED"
-  totalAmount Int         // Server-calculated total in integer satang (BR-01)
-  pickupNote  String?
-  items       OrderItem[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  customerId    String
+  customer      User        @relation(fields: [customerId], references: [id])
+  status        String      @default("PENDING") // "PENDING" | "ACCEPTED" | "BAKING" | "READY_FOR_PICKUP" | "COMPLETED" | "CANCELLED"
+  paymentStatus String      @default("UNPAID")  // "UNPAID" | "PAID" | "FAILED"
+  totalAmount   Int         // Server-calculated total in integer satang (BR-01)
+  pickupNote    String?
+  items         OrderItem[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([customerId])
   @@index([status, createdAt])
+  @@index([paymentStatus])
 }
 
 model OrderItem {

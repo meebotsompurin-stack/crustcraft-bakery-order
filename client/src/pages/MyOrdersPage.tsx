@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCustomerOrdersApi, type OrderDto } from '../services/api';
+import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
 
 export const MyOrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderDto[]>([]);
@@ -52,9 +53,27 @@ export const MyOrdersPage: React.FC = () => {
             Accepted / รับออเดอร์แล้ว
           </span>
         );
+      case 'BAKING':
+        return (
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 border border-orange-200">
+            Baking / กำลังอบ
+          </span>
+        );
+      case 'READY_FOR_PICKUP':
+        return (
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+            Ready for Pickup / พร้อมรับสินค้า
+          </span>
+        );
+      case 'COMPLETED':
+        return (
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+            Completed / เสร็จสมบูรณ์
+          </span>
+        );
       case 'CANCELLED':
         return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-600 border border-stone-200">
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700 border border-rose-200">
             Cancelled / ยกเลิกแล้ว
           </span>
         );
@@ -130,11 +149,12 @@ export const MyOrdersPage: React.FC = () => {
                 className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm hover:border-amber-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div>
-                  <div className="flex items-center gap-3 mb-1.5">
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
                     <span className="font-mono text-xs font-bold text-stone-500">
                       #{order.id.slice(-8)}
                     </span>
                     {getStatusBadge(order.status)}
+                    <PaymentStatusBadge status={order.paymentStatus} />
                   </div>
                   <p className="text-xs text-stone-500">Placed on {dateStr}</p>
                   <p className="text-sm text-stone-800 font-medium mt-2">
