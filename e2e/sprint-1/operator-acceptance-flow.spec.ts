@@ -2,11 +2,14 @@ import { test, expect, request } from '@playwright/test';
 import path from 'path';
 
 const SCREENSHOT_DIR = path.resolve(__dirname, '../screenshots/sprint-1');
+const ADMIN_EMAIL = 'admin@crustcraft.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'supersecret_admin_pass';
+const CUSTOMER_PASSWORD = process.env.DEMO_USER_PASSWORD || 'supersecret_demo_pass';
 
 async function ensurePendingOrder(baseURL: string = 'http://localhost:5173') {
   const apiContext = await request.newContext({ baseURL });
   await apiContext.post('/api/auth/login', {
-    data: { email: 'customer1@test.com', password: 'customer123' },
+    data: { email: 'customer1@test.com', password: CUSTOMER_PASSWORD },
   });
   const catalogRes = await apiContext.get('/api/catalog');
   const catalog = await catalogRes.json();
@@ -32,8 +35,8 @@ test.describe('Operator Acceptance Flow (E2E-06 to E2E-08)', () => {
     await page.goto('/login');
 
     // Fill operator login credentials
-    await page.fill('#email', 'operator@crustcraft.com');
-    await page.fill('#password', 'operator123');
+    await page.fill('#email', ADMIN_EMAIL);
+    await page.fill('#password', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
 
     // Operator is redirected to /operator/orders
@@ -57,8 +60,8 @@ test.describe('Operator Acceptance Flow (E2E-06 to E2E-08)', () => {
 
     await page.context().clearCookies();
     await page.goto('/login');
-    await page.fill('#email', 'operator@crustcraft.com');
-    await page.fill('#password', 'operator123');
+    await page.fill('#email', ADMIN_EMAIL);
+    await page.fill('#password', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('/operator/orders');
 
@@ -76,15 +79,15 @@ test.describe('Operator Acceptance Flow (E2E-06 to E2E-08)', () => {
 
     // Locate the specific order row by data-order-id to verify in-place update (AC-05-11, AC-06-02)
     const targetRow = page.locator(`[data-order-id="${orderId}"]`);
-    await expect(targetRow.getByText('Accepted ✓')).toBeVisible();
+    await expect(targetRow.getByText('Start Baking')).toBeVisible();
     await expect(targetRow.getByText('ACCEPTED', { exact: true })).toBeVisible();
   });
 
   test('E2E-08: Operator views order detail — full order information displayed', async ({ page }) => {
     await page.context().clearCookies();
     await page.goto('/login');
-    await page.fill('#email', 'operator@crustcraft.com');
-    await page.fill('#password', 'operator123');
+    await page.fill('#email', ADMIN_EMAIL);
+    await page.fill('#password', ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('/operator/orders');
 

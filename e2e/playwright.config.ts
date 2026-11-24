@@ -1,7 +1,20 @@
 import { defineConfig } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+
+// Load root .env if present (without overriding explicit environment variables)
+const rootEnvPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(rootEnvPath)) {
+  for (const line of fs.readFileSync(rootEnvPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    }
+  }
+}
 
 export default defineConfig({
-  testDir: './sprint-1',
+  testDir: '.',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -42,7 +55,10 @@ export default defineConfig({
       cwd: '..',
       timeout: 30000,
       env: {
-        DATABASE_URL: process.env.DATABASE_URL || 'file:./dev.db',
+        PORT: '3001',
+        DATABASE_URL:
+          process.env.DATABASE_URL ||
+          'postgresql://postgres:postgres@127.0.0.1:5432/crustcraft_test',
         JWT_SECRET: process.env.JWT_SECRET || 'crustcraft-e2e-jwt-secret-2026',
       },
     },

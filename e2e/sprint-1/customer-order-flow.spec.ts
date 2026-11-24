@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 
 const SCREENSHOT_DIR = path.resolve(__dirname, '../screenshots/sprint-1');
+const CUSTOMER_PASSWORD = process.env.DEMO_USER_PASSWORD || 'supersecret_demo_pass';
 
 test.describe('Customer Order Flow (E2E-01 to E2E-05)', () => {
   test('E2E-01: Customer registers successfully', async ({ page }, testInfo) => {
@@ -39,7 +40,7 @@ test.describe('Customer Order Flow (E2E-01 to E2E-05)', () => {
 
     // Fill customer login credentials
     await page.fill('#email', 'customer1@test.com');
-    await page.fill('#password', 'customer123');
+    await page.fill('#password', CUSTOMER_PASSWORD);
     await page.click('button[type="submit"]');
 
     // Customer logs in and is redirected to /catalog
@@ -66,7 +67,7 @@ test.describe('Customer Order Flow (E2E-01 to E2E-05)', () => {
     await page.context().clearCookies();
     await page.goto('/login');
     await page.fill('#email', 'customer1@test.com');
-    await page.fill('#password', 'customer123');
+    await page.fill('#password', CUSTOMER_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('/catalog');
 
@@ -110,7 +111,7 @@ test.describe('Customer Order Flow (E2E-01 to E2E-05)', () => {
     await page.context().clearCookies();
     await page.goto('/login');
     await page.fill('#email', 'customer1@test.com');
-    await page.fill('#password', 'customer123');
+    await page.fill('#password', CUSTOMER_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('/catalog');
 
@@ -134,7 +135,7 @@ test.describe('Customer Order Flow (E2E-01 to E2E-05)', () => {
     await page.context().clearCookies();
     await page.goto('/login');
     await page.fill('#email', 'customer1@test.com');
-    await page.fill('#password', 'customer123');
+    await page.fill('#password', CUSTOMER_PASSWORD);
     await page.click('button[type="submit"]');
     await page.waitForURL('/catalog');
 
