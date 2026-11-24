@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './sprint-1',
+  testDir: '.',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -42,7 +42,9 @@ export default defineConfig({
       cwd: '..',
       timeout: 30000,
       env: {
-        DATABASE_URL: process.env.DATABASE_URL || 'file:./dev.db',
+        DATABASE_URL:
+          process.env.DATABASE_URL ||
+          'postgresql://crustcraft:crustcraft_test_password@localhost:5432/crustcraft_test?schema=public',
         JWT_SECRET: process.env.JWT_SECRET || 'crustcraft-e2e-jwt-secret-2026',
       },
     },
