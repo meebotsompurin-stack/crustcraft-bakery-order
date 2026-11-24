@@ -58,7 +58,7 @@ export default defineConfig({
         PORT: '3001',
         DATABASE_URL:
           process.env.DATABASE_URL ||
-          'postgresql://postgres:postgres@127.0.0.1:5432/crustcraft_test',
+          'postgresql://crustcraft:crustcraft_test_password@localhost:5432/crustcraft_test?schema=public',
         JWT_SECRET: process.env.JWT_SECRET || 'crustcraft-e2e-jwt-secret-2026',
       },
     },

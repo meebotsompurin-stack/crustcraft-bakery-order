@@ -55,14 +55,24 @@ test.describe('F-07 Simulated Payment Transitions E2E (E2E-S2-04)', () => {
     await page.click('button:has-text("Simulate Failed Payment")');
     await expect(page.locator('[data-payment-status="FAILED"]').first()).toBeVisible();
 
-    // 3. Retry with Pay Now (Simulated) -> Paid badge
+    // 3. Retry with Pay Now (Simulated) -> Paid badge + NFR-04 overflow check
     await page.click('button:has-text("Pay Now (Simulated)")');
     await expect(page.locator('[data-payment-status="PAID"]').first()).toBeVisible();
     await expect(page.getByText('Payment confirmed.')).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true);
 
-    // 4. Operator logs in and views /operator/orders/:id -> sees Paid badge
+    // 4. Operator logs in and views /operator/orders/:id -> sees Paid badge + NFR-04 overflow check
     await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD, '/operator/orders');
     await page.goto(`/operator/orders/${order.id}`);
     await expect(page.locator('[data-payment-status="PAID"]').first()).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true);
   });
 });

@@ -44,27 +44,40 @@ test.describe('F-06 Fulfillment & Cancellation Lifecycle E2E (E2E-S2-02 & E2E-S2
   test('E2E-S2-02: Customer places order, cancels it on /orders/:id, sees CANCELLED badge and restored stock on /catalog', async ({
     page,
   }) => {
-    // 1. Login as customer and inspect initial stock via API
+    // 1. Login as customer and select a deterministic in-stock card by data-testid
     await loginAs(page, CUSTOMER_EMAIL, CUSTOMER_PASSWORD, '/catalog');
 
-    const firstCard = page.locator('[data-testid^="bakery-item-card-"]').first();
-    await expect(firstCard).toBeVisible();
-    const stockBadgeText = await firstCard.locator('[data-testid="badge-in-stock"]').textContent();
+    const inStockCard = page
+      .locator('[data-testid^="bakery-item-card-"]')
+      .filter({ has: page.locator('[data-testid="badge-in-stock"]') })
+      .first();
+    await expect(inStockCard).toBeVisible();
+    const targetCardTestId = await inStockCard.getAttribute('data-testid');
+    expect(targetCardTestId).toBeTruthy();
+
+    const stockBadgeText = await inStockCard
+      .locator('[data-testid="badge-in-stock"]')
+      .textContent();
     const stockMatchBefore = stockBadgeText?.match(/In Stock:\s*(\d+)/);
     expect(stockMatchBefore).toBeTruthy();
     const initialStock = Number(stockMatchBefore![1]);
 
-    // 2. Place a pre-order for 1 unit of the first item
+    // 2. Place a pre-order for 1 unit of that exact item
     await page.goto('/orders/new');
     await expect(page.locator('h1')).toContainText('Create New Pre-Order');
-    const orderCards = page.locator('[data-testid^="bakery-item-card-"]');
-    await expect(orderCards.first()).toBeVisible();
-    await orderCards.first().locator('button:has-text("+")').click();
+    const targetOrderCard = page.locator(`[data-testid="${targetCardTestId}"]`);
+    await expect(targetOrderCard).toBeVisible();
+    await targetOrderCard.locator('button:has-text("+")').click();
     await page.click('button:has-text("Confirm Pre-Order")');
     await page.waitForURL(/\/orders\/[a-z0-9-]+$/);
 
-    // 3. Verify PENDING state and cancel the order
+    // 3. Verify PENDING state, NFR-04 zero horizontal overflow, and cancel the order
     await expect(page.locator('text=Pending Acceptance / รอยืนยัน')).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true);
     await page.click('button:has-text("Cancel Order")');
     await page.click('button:has-text("Confirm Cancellation")');
 
@@ -72,10 +85,11 @@ test.describe('F-06 Fulfillment & Cancellation Lifecycle E2E (E2E-S2-02 & E2E-S2
     await expect(page.locator('text=Cancelled / ยกเลิกแล้ว')).toBeVisible();
     await expect(page.getByRole('status')).toContainText('restored');
 
-    // 5. Return to /catalog and confirm stock is restored to initialStock
+    // 5. Return to /catalog and confirm stock is restored on that exact same card
     await page.goto('/catalog');
-    await expect(firstCard).toBeVisible();
-    await expect(firstCard.locator('[data-testid="badge-in-stock"]')).toContainText(
+    const restoredCard = page.locator(`[data-testid="${targetCardTestId}"]`);
+    await expect(restoredCard).toBeVisible();
+    await expect(restoredCard.locator('[data-testid="badge-in-stock"]')).toContainText(
       `In Stock: ${initialStock}`
     );
   });
@@ -107,6 +121,11 @@ test.describe('F-06 Fulfillment & Cancellation Lifecycle E2E (E2E-S2-02 & E2E-S2
     await page.click('button:has-text("Mark Completed")');
     await expect(page.getByText('COMPLETED', { exact: true })).toBeVisible();
     await expect(page.getByText('Completed ✓')).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true);
 
     // 2. Customer views /orders/:id and sees COMPLETED badge
     await loginAs(page, CUSTOMER_EMAIL, CUSTOMER_PASSWORD, '/catalog');

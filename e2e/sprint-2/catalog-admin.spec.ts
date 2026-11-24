@@ -49,6 +49,11 @@ test.describe('F-05 Bakery Catalog Administration E2E (E2E-S2-01)', () => {
     await expect(itemContainer).toBeVisible();
     await expect(itemContainer).toContainText('฿95.00');
     await expect(itemContainer).toContainText('5');
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true);
 
     // 3. Restock item (+10 Restock -> 15)
     await itemContainer.locator('button:has-text("+10 Restock")').click();
