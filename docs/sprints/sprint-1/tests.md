@@ -3,11 +3,18 @@
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
 > **Deliverable Section:** Deliverable 1 — Part E (System Test Specification & Traceability Matrix)  
-> **Sprint 1 Status:** 🟡 In Progress (Engineering Contracts Baseline — Pre-Implementation)  
-> **Total Sprint 1 Test IDs:** 44 (`AUTH` × 10, `CAT` × 5, `ORD` × 12, `OPS` × 8, `E2E` × 9)  
+> **Sprint 1 Status:** 🟢 Accepted Baseline (`v1.0.0-sprint1`) → Revised `v1.1.0` for Lab 7 `CR-01` (Pre-Implementation Contract Gate)  
+> **Document Version:** `1.1.0`  
+> **Total Test IDs:** 44 Sprint 1 Baseline (`AUTH` × 10, `CAT` × 5, `ORD` × 12, `OPS` × 8, `E2E` × 9) + 9 Lab 7 `CR-01` (`CR01` × 6, `CR01-UI` × 2, `E2E-CR01` × 1) = **53 Test IDs** *(+ 1 versioned intended update to `ORD-08`)*  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
+
+### Revision History
+| Version | Date | Issue / PR | Summary of Changes |
+|---|---|---|---|
+| `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial Software Test Specification covering 44 Sprint 1 Test IDs (`AUTH-01..10`, `CAT-01..05`, `ORD-01..12`, `OPS-01..08`, `E2E-01..09`). |
+| `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Added §2.6 Lab 7 `CR-01` Test Suite (`CR01-01..06`, `CR01-UI-01..02`, `E2E-CR01-01`), added Client Component RTL layer in §1, documented the versioned intended update to `ORD-08` (L429) in §2.3, and mapped `AC-CR01-01..06` in §4. |
 
 ---
 
@@ -15,12 +22,14 @@
 
 CrustCraft enforces strict **Test-Driven Development (TDD)** across all feature issues (`ISSUE-03` through `ISSUE-06`). In every feature branch, test suites are authored and committed **before** the corresponding business logic and route handlers are implemented.
 
-1. **Unit Tests (Vitest — `server/src/__tests__/unit/*.test.ts`):**
+1. **Server Unit Tests (Vitest — `server/src/__tests__/unit/*.test.ts`):**
    - Verify isolated domain logic without HTTP transport overhead: `bcrypt` password hashing and verification (`AUTH-10`), JWT payload encoding/decoding and `req.user` extraction (`AUTH-08`), authoritative server-side integer satang total calculation (`ORD-02`), and `unitPriceAtOrder` satang price snapshotting (`ORD-03`).
-2. **API & Database Integration Tests (Vitest + Supertest — `server/src/__tests__/sprint-1/*.api.test.ts`):**
-   - Execute full HTTP requests against the Express application backed by an isolated test SQLite database (`file:./test.db`).
-   - Verify HTTP status codes, standard error envelopes (`{ error: { code, message, details? } }`), dual-channel JWT resolution (`httpOnly` cookie primary + `Authorization: Bearer <token>` fallback), role guards (`requireRole`), atomic database stock deductions (`prisma.$transaction`), `isAvailable` vs. `stockQuantity` separation (`BR-05`), customer ownership isolation (`BR-04`), and shared operator queue state transitions (`BR-06`, `BR-07`).
-3. **End-to-End Multi-Viewport Browser Tests (Playwright — `e2e/sprint-1/*.spec.ts`):**
+2. **Client Component Unit/UI Tests (Vitest + React Testing Library + `jsdom` — `client/src/components/__tests__/*.test.tsx`):**
+   - Verify React component rendering, disabled button boundaries, and user-facing validation notices in isolation (e.g., `BakeryItemCard` `Math.min(stockQuantity, 5)` cap and `"Max 5 per item"` notice in `CR01-UI-01..02`).
+3. **API & Database Integration Tests (Vitest + Supertest — `server/src/__tests__/sprint-1/*.api.test.ts`, `server/src/__tests__/lab-7/*.api.test.ts`):**
+   - Execute full HTTP requests against the Express application backed by an isolated test database (PostgreSQL 16 post-Lab 5; originally SQLite `file:./test.db` in Sprint 1).
+   - Verify HTTP status codes, standard error envelopes (`{ error: { code, message, details? } }`), dual-channel JWT resolution (`httpOnly` cookie primary + `Authorization: Bearer <token>` fallback), role guards (`requireRole`), per-item quantity cap (`1 <= quantity <= 5`), duplicate `bakeryItemId` `400` guard, `400`-before-`409` precedence, atomic database stock deductions (`prisma.$transaction`), `isAvailable` vs. `stockQuantity` separation (`BR-05`), customer ownership isolation (`BR-04`), and shared operator queue state transitions (`BR-06`, `BR-07`).
+4. **End-to-End Multi-Viewport Browser Tests (Playwright — `e2e/sprint-1/*.spec.ts`, `e2e/lab-7/*.spec.ts`):**
    - Verify complete user journeys in real headless browsers across three mandatory responsive viewports:
      - **Desktop:** `1280px × 720px`
      - **Tablet:** `768px × 1024px`
@@ -73,7 +82,7 @@ CrustCraft enforces strict **Test-Driven Development (TDD)** across all feature 
 | **ORD-05** | API Integration | `AC-03-03` (`AC-04-11`) | Transactional atomicity (`prisma.$transaction`) when one item in a multi-item order has insufficient stock (`BR-03`) | Returns `409 CONFLICT`; transaction rolls back completely — first item's `stockQuantity` is NOT decremented and no `Order` record is persisted. | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
 | **ORD-06** | API Integration | `AC-03-07` (`AC-04-12`) | `POST /api/customer/orders` with `quantity <= 0` or empty `items` array | Returns `400 VALIDATION_ERROR` with `{ error: { code: "VALIDATION_ERROR", ... } }`. | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
 | **ORD-07** | API Integration | `AC-03-04` (`AC-04-13`) | `POST /api/customer/orders` containing an item with `isAvailable == false` (`BR-05`) | Returns `409 CONFLICT` with `{ error: { code: "CONFLICT", ... } }`. | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
-| **ORD-08** | API Integration | `AC-03-05` (`AC-04-14`) | `POST /api/customer/orders` with `quantity > stockQuantity` or `stockQuantity == 0` (`BR-05`) | Returns `409 CONFLICT` with `{ error: { code: "CONFLICT", ... } }`; stock remains unchanged. | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
+| **ORD-08** *(v1.1.0 intended update)* | API Integration | `AC-03-05` (`AC-04-14`), `AC-CR01-03` | `POST /api/customer/orders` with `stockQuantity == 0` or valid `quantity <= 5` exceeding lower `stockQuantity` (`BR-05`) | Returns `409 CONFLICT` with `{ error: { code: "CONFLICT", message: "...Insufficient stock..." } }`; stock remains unchanged. **Lab 7 `CR-01` Revision Note (TA Condition #3):** In v1.0.0 (`orders.api.test.ts` L429), sub-case 2 sent `quantity: 20` against `itemInStockA` (actual remaining stock `7` = `10 - 2 - 1` after the Lab 6 `#58` test at L389, though inline comment at L424 says `8`). Because `CR-01` enforces `quantity <= 5` with `400`-before-`409` precedence, L429 is intentionally updated in `LAB7-ISSUE-02` (`#75`) to test a valid `quantity <= 5` exceeding a lower stock (e.g., `stockQuantity: 3`, `quantity: 5`) so `409 CONFLICT` stock enforcement remains strictly verified without weakening assertions. | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
 | **ORD-09** | API Integration | `AC-03-06` (`AC-04-15`) | `GET /api/customer/orders` returns only orders belonging to authenticated `CUSTOMER` (`BR-04`) | Returns `200 OK`; every returned order has `customerId === req.user.userId` (orders from other customers are excluded). | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
 | **ORD-10** | API Integration | `AC-03-06` (`AC-04-16`) | `GET /api/customer/orders/:id` for customer's own order | Returns `200 OK` with full order detail including `items`, `unitPriceAtOrder` (`Int` satang), and `totalAmount` (`Int` satang). | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
 | **ORD-11** | API Integration | `AC-03-06` (`AC-04-17`) | `GET /api/customer/orders/:id` when Customer A requests Customer B's order (`BR-04`) | Returns `403 FORBIDDEN` with `{ error: { code: "FORBIDDEN", ... } }`. | `server/src/__tests__/sprint-1/orders.api.test.ts` | ⬜ |
@@ -109,6 +118,24 @@ CrustCraft enforces strict **Test-Driven Development (TDD)** across all feature 
 | **E2E-07** | Playwright E2E | `AC-04-02` (`AC-05-11`), `AC-06-02` | Operator accepts a `PENDING` order from the queue | Clicking `"Accept Order"` transitions the row status badge to `ACCEPTED` in-place without full page reload. | `e2e/sprint-1/operator-acceptance-flow.spec.ts` | ⬜ |
 | **E2E-08** | Playwright E2E | `AC-04-04` (`AC-05-10`), `AC-06-02` | Operator inspects full order detail on `/operator/orders/:id` | Operator detail view displays customer name/email, line items, THB totals, and `ACCEPTED` status. | `e2e/sprint-1/operator-acceptance-flow.spec.ts` | ⬜ |
 | **E2E-09** | Playwright E2E | `AC-01-04`, `AC-06-03` | Unauthenticated guard & post-logout redirect protection | Navigating to `/catalog`, `/orders`, or `/operator/orders` without a valid session redirects immediately to `/login`. | `e2e/sprint-1/auth-guard.spec.ts` | ⬜ |
+
+---
+
+### 2.6 Lab 7 `CR-01` Per-Item Quantity Cap Suite (`CR01-01`..`06`, `CR01-UI-01`..`02`, `E2E-CR01-01` — `LAB7-ISSUE-02` / `#75`)
+
+> **TDD Mandate:** All 9 tests below MUST be committed and executed against the pre-change implementation (`RED` — failing due to missing `<= 5` cap, never compile/fixture errors) before committing the implementation (`GREEN`) in `#75`.
+
+| Test ID | Type | AC Reference | Input & Precondition | Expected Result (RED → GREEN) | Test File | Status |
+|---|---|---|---|---|---|:---:|
+| **CR01-01** | API Integration | `AC-CR01-01` | Authenticated `CUSTOMER`; item has `isAvailable: true`, `stockQuantity: 20`; `POST /api/customer/orders` with `{ items: [{ bakeryItemId, quantity: 5 }] }` | Boundary allowed: `201 Created`, `order.items[0].quantity === 5`, `BakeryItem.stockQuantity` decremented `20 → 15`. | `server/src/__tests__/lab-7/order-quantity-cap.api.test.ts` | ⬜ |
+| **CR01-02** | API Integration | `AC-CR01-01` | Authenticated `CUSTOMER`; item has `isAvailable: true`, `stockQuantity: 20`; `POST /api/customer/orders` with `{ items: [{ bakeryItemId, quantity: 6 }] }` | **RED:** `201 Created` → **GREEN:** `400 VALIDATION_ERROR`, `error.message === "Maximum order quantity is 5 units per item per order."`, `error.details === [{ field: "items[0].quantity", issue: "Quantity cannot exceed 5 per item per order" }]`, stock remains `20`, no order persisted. | `server/src/__tests__/lab-7/order-quantity-cap.api.test.ts` | ⬜ |
+| **CR01-03** | API Integration | `AC-CR01-02` | Authenticated `CUSTOMER`; item A (`stockQuantity: 20`), item B (`stockQuantity: 20`); `POST /api/customer/orders` with `items[0]: { itemA, quantity: 2 }`, `items[1]: { itemB, quantity: 6 }` | **RED:** `201 Created` → **GREEN:** `400 VALIDATION_ERROR`, exact `error.details[0].field === "items[1].quantity"`, `error.details[0].issue === "Quantity cannot exceed 5 per item per order"`, zero stock deducted for both item A (`20`) and item B (`20`), no order persisted. | `server/src/__tests__/lab-7/order-quantity-cap.api.test.ts` | ⬜ |
+| **CR01-04** | API Integration | `AC-CR01-03` | Authenticated `CUSTOMER`; item has `isAvailable: true`, `stockQuantity: 3`; `POST /api/customer/orders` with `{ items: [{ bakeryItemId, quantity: 5 }] }` | Existing `BR-03`/`BR-05` stock guard preserved: `409 CONFLICT`, `error.code === "CONFLICT"`, stock remains `3`, no order persisted. | `server/src/__tests__/lab-7/order-quantity-cap.api.test.ts` | ⬜ |
+| **CR01-05** | API Integration | `AC-CR01-04` | Authenticated `CUSTOMER`; item A has `stockQuantity: 20`; `POST /api/customer/orders` with duplicate entries `items[0]: { itemA, quantity: 5 }`, `items[1]: { itemA, quantity: 5 }` (TA Condition #1 anti-bypass) | Rejected before transaction: `400 VALIDATION_ERROR`, `error.details[0].field === "items[1].bakeryItemId"`, stock remains `20`, no order persisted. | `server/src/__tests__/lab-7/order-quantity-cap.api.test.ts` | ⬜ |
+| **CR01-06** | API Integration | `AC-CR01-03` | Authenticated `CUSTOMER`; item has `isAvailable: true`, `stockQuantity: 3`; `POST /api/customer/orders` with `{ items: [{ bakeryItemId, quantity: 6 }] }` (simultaneous `> 5` and `> stockQuantity`, TA Condition #2) | **RED:** `409 CONFLICT` → **GREEN:** `400 VALIDATION_ERROR` **before** `409 CONFLICT`, `error.details[0].field === "items[0].quantity"`, stock remains `3`, no order persisted. | `server/src/__tests__/lab-7/order-quantity-cap.api.test.ts` | ⬜ |
+| **CR01-UI-01** | Client Component (RTL + `jsdom`) | `AC-CR01-05` | Render `BakeryItemCard` with `onQuantityChange`: (a) `stockQuantity: 20`, `selectedQuantity: 5`; (b) `stockQuantity: 3`, `selectedQuantity: 3` | **RED:** `+` button enabled at qty 5 when stock is 20 → **GREEN:** `+` button is `disabled` at `Math.min(stockQuantity, 5)` (disabled at `5` when stock is `20`, and disabled at `3` when stock is `3`). | `client/src/components/__tests__/BakeryItemCard.test.tsx` | ⬜ |
+| **CR01-UI-02** | Client Component (RTL + `jsdom`) | `AC-CR01-05` | Render `BakeryItemCard` for an in-stock bakery item (`stockQuantity: 20`) | **RED:** `"Max 5 per item"` not found → **GREEN:** `"Max 5 per item"` notice is visible in the rendered card. | `client/src/components/__tests__/BakeryItemCard.test.tsx` | ⬜ |
+| **E2E-CR01-01** | Playwright E2E | `AC-CR01-06` | Authenticated `CUSTOMER` on `/orders/new` across Desktop (`1280px`), Tablet (`768px`), and Mobile (`375px`) with an item having `stockQuantity >= 20` | **RED:** `"Max 5 per item"` missing / `+` increments to `6` → **GREEN:** `"Max 5 per item"` is visible, clicking `+` 5 times reaches `5` and disables `+` (`OrderSummary` on `/orders/new` shows `5 ×`), and submitting the order succeeds (`201`) and redirects to `/orders/:id` showing `× 5` (e.g., `฿<price> × 5` in `OrderDetailPage`). | `e2e/lab-7/order-quantity-cap.spec.ts` | ⬜ |
 
 ---
 
@@ -175,3 +202,9 @@ Every Acceptance Criterion defined in [`specification.md`](./specification.md) i
 | **E2E Journeys** | `AC-06-01` | `AC-06-01`, `AC-06-04` | `E2E-01`, `E2E-02`, `E2E-03`, `E2E-04`, `E2E-05` | ✅ Covered (E2E 3 Viewports) |
 | **E2E Journeys** | `AC-06-02` | `AC-06-02`, `AC-06-04` | `E2E-06`, `E2E-07`, `E2E-08` | ✅ Covered (E2E 3 Viewports) |
 | **E2E Journeys** | `AC-06-03` | `AC-06-03`, `AC-06-04` | `E2E-09` | ✅ Covered (E2E 3 Viewports) |
+| **Lab 7 `CR-01` (`F-03`)** | `AC-CR01-01` | `AC-LAB7-02-01` | `CR01-01`, `CR01-02` | ✅ Covered (API Integration) |
+| **Lab 7 `CR-01` (`F-03`)** | `AC-CR01-02` | `AC-LAB7-02-02` | `CR01-03` | ✅ Covered (API Integration) |
+| **Lab 7 `CR-01` (`F-03`)** | `AC-CR01-03` | `AC-LAB7-02-03`, `AC-LAB7-02-06` | `CR01-04`, `CR01-06`, `ORD-08` *(intended update)* | ✅ Covered (API Integration) |
+| **Lab 7 `CR-01` (`F-03`)** | `AC-CR01-04` | `AC-LAB7-02-04` | `CR01-05` | ✅ Covered (API Integration) |
+| **Lab 7 `CR-01` (`F-03`)** | `AC-CR01-05` | `AC-LAB7-02-05` | `CR01-UI-01`, `CR01-UI-02` | ✅ Covered (Client RTL + `jsdom`) |
+| **Lab 7 `CR-01` (`F-03`)** | `AC-CR01-06` | `AC-LAB7-02-06` | `E2E-CR01-01` | ✅ Covered (Playwright E2E 3 Viewports) |

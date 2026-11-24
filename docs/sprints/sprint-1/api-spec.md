@@ -3,11 +3,18 @@
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
 > **Deliverable Section:** Deliverable 1 — Part E (API Contract Specification)  
-> **Sprint 1 Status:** 🟡 In Progress (Engineering Contracts Baseline — Pre-Implementation)  
+> **Sprint 1 Status:** 🟢 Accepted Baseline (`v1.0.0-sprint1`) → Revised `v1.1.0` for Lab 7 `CR-01` (Pre-Implementation Contract Gate)  
+> **Document Version:** `1.1.0`  
 > **Base URL (Local Development):** `http://localhost:3001` (proxied via Vite `/api` in development)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
+
+### Revision History
+| Version | Date | Issue / PR | Summary of Changes |
+|---|---|---|---|
+| `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial Sprint 1 API Contract covering `/api/auth/*`, `/api/catalog/*`, `/api/customer/*`, and `/api/operator/*`. |
+| `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Updated `POST /api/customer/orders` (§2, §3, §6.1) to enforce `1 <= quantity <= 5` (`MAX_QUANTITY_PER_ITEM = 5`), duplicate `bakeryItemId` `400 VALIDATION_ERROR` rejection, `400`-before-`409` precedence, and exact indexed `details[].field` error envelopes. |
 
 ---
 
@@ -39,7 +46,7 @@
 
 | HTTP Status | `error.code` String | Meaning & Trigger Conditions |
 |:---:|---|---|
-| `400` | `VALIDATION_ERROR` | Malformed request body, missing required fields, invalid email format, password `< 8` chars, `quantity <= 0`, empty `items` array, or unsupported order status value in request payload. |
+| `400` | `VALIDATION_ERROR` | Malformed request body, missing required fields, invalid email format, password `< 8` chars, empty `items` array, `pickupNote > 500` chars (Lab 6 `#58`), duplicate `bakeryItemId` in `items[]` (`CR01-05`), `quantity <= 0` (`ORD-06`), **`quantity > 5`** (`CR01-02`, `CR01-03`, `CR01-06` — takes precedence over `409 CONFLICT`), or unsupported order status value in request payload. |
 | `401` | `UNAUTHORIZED` | Missing authentication credentials (no `req.cookies.token` and no `Authorization: Bearer <token>`), malformed/invalid JWT signature, expired JWT (`> 24h`), or invalid login email/password. |
 | `403` | `FORBIDDEN` | Authenticated user lacks required role (`CUSTOMER` calling `/api/operator/*` or `OPERATOR` calling `/api/customer/*`), or `CUSTOMER` attempting to access an order where `order.customerId !== req.user.userId` (`BR-04`). |
 | `404` | `NOT_FOUND` | Requested `BakeryItem` ID or `Order` ID does not exist in the database. |
@@ -81,10 +88,10 @@ export type BakeryItemResponse = {
 
 export type CreateOrderBody = {
   items: Array<{
-    bakeryItemId: string;
-    quantity: number;     // Positive integer (> 0)
+    bakeryItemId: string; // Non-empty trimmed string; MUST be unique across items[] (CR01-05)
+    quantity: number;     // Integer satisfying 1 <= quantity <= 5 (MAX_QUANTITY_PER_ITEM = 5, CR-01)
   }>;
-  pickupNote?: string;
+  pickupNote?: string;    // Optional, maximum 500 characters (Lab 6 #58)
 };
 
 export type OrderItemResponse = {
@@ -278,12 +285,20 @@ Returns the full detail of a single `BakeryItem` by its `id`.
 ## 6. Customer Pre-Order Endpoints (`/api/customer`)
 
 ### 6.1 `POST /api/customer/orders`
-Creates a new customer pre-order. Enforces strict domain validation and transactional atomicity:
-1. **Input Validation (`400`):** Verifies `items` is a non-empty array and every entry has a valid `bakeryItemId` and integer `quantity > 0`.
-2. **Existence Check (`404`):** Verifies all referenced `bakeryItemId` records exist in `BakeryItem`.
-3. **Availability & Stock Guard (`409`, `BR-05`):** Verifies every item has `isAvailable === true` and `stockQuantity >= quantity` (rejecting if `stockQuantity === 0` or `quantity > stockQuantity`).
+Creates a new customer pre-order. Enforces strict **pre-transaction domain validation** (`400` before `409` precedence) followed by **transactional atomicity**:
+1. **Pre-Transaction Input & Domain Validation (`400 VALIDATION_ERROR` — runs BEFORE `prisma.$transaction`):**
+   - Verifies `items` is a non-empty array (`details[0].field === "items"`).
+   - Verifies `pickupNote` (when provided) is a string of `<= 500` trimmed characters (`details[0].field === "pickupNote"`, Lab 6 `#58`).
+   - Iterates `items` by `index` (`0..items.length - 1`) and validates in order:
+     - Each entry is a non-null plain object (`items[<index>]`) with a non-empty trimmed string `bakeryItemId` (`items[<index>].bakeryItemId`).
+     - **Duplicate `bakeryItemId` Guard (TA Condition #1 / `CR01-05`):** Rejects any repeated `bakeryItemId` within `items[]` (e.g., two lines of `quantity: 5` for the same item) with `400 VALIDATION_ERROR` and `details: [{ field: "items[<index>].bakeryItemId", issue: "Duplicate bakeryItemId entries are not allowed in a single order" }]`.
+     - **Positive Integer Check (`ORD-06`):** Rejects non-integer or `quantity <= 0` with `400 VALIDATION_ERROR` and `details: [{ field: "items[<index>].quantity", issue: "Must be an integer greater than 0" }]`.
+     - **Per-Item Maximum Quantity Cap (`CR-01` / `MAX_QUANTITY_PER_ITEM = 5` / TA Condition #2):** Rejects `quantity > 5` with `400 VALIDATION_ERROR`, exact message `"Maximum order quantity is 5 units per item per order."`, and exact indexed `details: [{ field: "items[<index>].quantity", issue: "Quantity cannot exceed 5 per item per order" }]` (`CR01-02`, `CR01-03`, `CR01-06`).
+   - **Precedence Rule (`400` before `409`):** Because Step 1 completes prior to opening `prisma.$transaction`, a request with `quantity > 5` on an item with `stockQuantity < quantity` (e.g., `quantity: 6` when `stockQuantity: 3`) MUST return `400 VALIDATION_ERROR` **before** `409 CONFLICT` (`CR01-06`).
+2. **Existence Check (`404`):** Inside `prisma.$transaction`, verifies all referenced `bakeryItemId` records exist in `BakeryItem`.
+3. **Availability & Stock Guard (`409`, `BR-05`):** Verifies every item has `isAvailable === true` and `stockQuantity >= quantity` (rejecting if `stockQuantity === 0` or `quantity > stockQuantity` for valid `1 <= quantity <= 5`, e.g., `CR01-04` and updated `ORD-08`).
 4. **Server-Side Satang Calculation (`BR-01`, `BR-02`):** Ignores any price fields sent by the client; snapshots `unitPriceAtOrder = bakeryItem.price` (`Int` satang) for each item and computes `totalAmount = sum(bakeryItem.price * quantity)` (`Int` satang).
-5. **Atomic Transaction (`BR-03`):** Executes stock decrements (`stockQuantity - quantity`) and order creation inside a single `prisma.$transaction`. Note: If `stockQuantity` becomes `0`, `isAvailable` remains `true` (`BR-05`).
+5. **Atomic Transaction (`BR-03`):** Executes conditional stock decrements (`stockQuantity - quantity`) and order creation inside a single `prisma.$transaction`. Note: If `stockQuantity` becomes `0`, `isAvailable` remains `true` (`BR-05`).
 
 * **Auth Required:** Yes (`requireRole(['CUSTOMER'])`)
 * **Request Body:**
@@ -335,11 +350,35 @@ Creates a new customer pre-order. Enforces strict domain validation and transact
   }
   ```
 * **Error Responses:**
-  * `400 VALIDATION_ERROR`: Empty `items` array, missing `bakeryItemId`, or `quantity <= 0` (`ORD-06`).
+  * `400 VALIDATION_ERROR`: Empty `items` array, missing `bakeryItemId`, `pickupNote > 500` chars, `quantity <= 0` (`ORD-06`), **`quantity > 5`** (`CR01-02`, `CR01-03`, `CR01-06`), or **duplicate `bakeryItemId` in `items[]`** (`CR01-05`). Takes precedence over `409 CONFLICT`; zero stock is deducted and no order is persisted.
+    * *Example (`quantity > 5`, indexed at `items[1]` — `CR01-03`):*
+      ```json
+      {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "Maximum order quantity is 5 units per item per order.",
+          "details": [
+            { "field": "items[1].quantity", "issue": "Quantity cannot exceed 5 per item per order" }
+          ]
+        }
+      }
+      ```
+    * *Example (duplicate `bakeryItemId` at `items[1]` — `CR01-05`):*
+      ```json
+      {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "Duplicate bakeryItemId 'clx1item0001' entries are not allowed in a single order.",
+          "details": [
+            { "field": "items[1].bakeryItemId", "issue": "Duplicate bakeryItemId entries are not allowed in a single order" }
+          ]
+        }
+      }
+      ```
   * `401 UNAUTHORIZED`: Unauthenticated request.
   * `403 FORBIDDEN`: Authenticated user is an `OPERATOR` (only `CUSTOMER` can place pre-orders).
   * `404 NOT_FOUND`: One or more `bakeryItemId` values do not exist.
-  * `409 CONFLICT`: Item has `isAvailable == false` (`ORD-07`), or item has `stockQuantity == 0` / `quantity > stockQuantity` (`ORD-05`, `ORD-08`). Entire transaction rolls back with zero stock deducted.
+  * `409 CONFLICT`: Item has `isAvailable == false` (`ORD-07`), or item has `stockQuantity == 0` / `quantity > stockQuantity` (for valid `1 <= quantity <= 5`: `ORD-05`, `ORD-08` updated, `CR01-04`). Entire transaction rolls back with zero stock deducted.
 
 ---
 

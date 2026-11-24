@@ -2,6 +2,8 @@ import { prisma } from '../lib/db';
 import type { PaymentStatus } from '../lib/orderStatus';
 import { AppError } from './auth.service';
 
+export const MAX_QUANTITY_PER_ITEM = 5;
+
 export interface CalculationItemInput {
   bakeryItemId: string;
   quantity: number;
@@ -180,6 +182,20 @@ export async function createCustomerOrder(
         'VALIDATION_ERROR',
         'Quantity must be an integer greater than 0.',
         [{ field: `items[${index}].quantity`, issue: 'Must be an integer greater than 0' }]
+      );
+    }
+
+    if (item.quantity > MAX_QUANTITY_PER_ITEM) {
+      throw new AppError(
+        400,
+        'VALIDATION_ERROR',
+        'Maximum order quantity is 5 units per item per order.',
+        [
+          {
+            field: `items[${index}].quantity`,
+            issue: 'Quantity cannot exceed 5 per item per order',
+          },
+        ]
       );
     }
   }

@@ -27,12 +27,14 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
 
   const itemInStockA = `ord-item-a-${testRunId}`;
   const itemInStockB = `ord-item-b-${testRunId}`;
+  const itemLowStock = `ord-item-low-${testRunId}`;
   const itemZeroStock = `ord-item-zero-${testRunId}`;
   const itemUnavailable = `ord-item-unavail-${testRunId}`;
 
   const ownedItemIds = [
     itemInStockA,
     itemInStockB,
+    itemLowStock,
     itemZeroStock,
     itemUnavailable,
   ];
@@ -111,6 +113,19 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
         stockQuantity: 5,
         isAvailable: true,
         category: 'Pastry',
+      },
+    });
+
+    // 2b. Low-stock item for ORD-08 (stock: 3, used to verify 409 CONFLICT with valid qty <= 5 per Lab 7 CR-01)
+    await prisma.bakeryItem.create({
+      data: {
+        id: itemLowStock,
+        name: `Brioche Low Stock Test ${testRunId}`,
+        description: 'Sweet bread item with 3 stock units',
+        price: 6500,
+        stockQuantity: 3,
+        isAvailable: true,
+        category: 'Sweet Bread',
       },
     });
 
@@ -421,12 +436,12 @@ describe('F-03 Customer Pre-Order API Integration Tests (ORD-01, ORD-04 to ORD-1
       expect(zeroStockRes.body.error.code).toBe('CONFLICT');
       expect(zeroStockRes.body.error.message).toContain('Insufficient stock');
 
-      // 2. Quantity exceeds stock (itemInStockA has 8 units left, requesting 20)
+      // 2. Quantity exceeds stock (Lab 7 CR-01 intended update: valid quantity <= 5 exceeding lower stockQuantity === 3)
       const exceedStockRes = await request(app)
         .post('/api/customer/orders')
         .set('Authorization', `Bearer ${customer1Token}`)
         .send({
-          items: [{ bakeryItemId: itemInStockA, quantity: 20 }],
+          items: [{ bakeryItemId: itemLowStock, quantity: 5 }],
         });
 
       expect(exceedStockRes.status).toBe(409);

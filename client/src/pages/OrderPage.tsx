@@ -5,7 +5,10 @@ import {
   createCustomerOrderApi,
   type BakeryItemDto,
 } from '../services/api';
-import { BakeryItemCard } from '../components/BakeryItemCard';
+import {
+  BakeryItemCard,
+  MAX_QUANTITY_PER_ITEM,
+} from '../components/BakeryItemCard';
 import { OrderSummary } from '../components/OrderSummary';
 
 export const OrderPage: React.FC = () => {
@@ -62,9 +65,14 @@ export const OrderPage: React.FC = () => {
   }, [preselectId]);
 
   const handleQuantityChange = (itemId: string, newQty: number) => {
+    const targetItem = items.find((i) => i.id === itemId);
+    const maxQty = targetItem
+      ? Math.min(targetItem.stockQuantity, MAX_QUANTITY_PER_ITEM)
+      : MAX_QUANTITY_PER_ITEM;
+    const clampedQty = Math.max(0, Math.min(newQty, maxQty));
     setQuantities((prev) => ({
       ...prev,
-      [itemId]: newQty,
+      [itemId]: clampedQty,
     }));
   };
 

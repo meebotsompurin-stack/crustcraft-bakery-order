@@ -1,6 +1,8 @@
 import React from 'react';
 import { type BakeryItemDto } from '../services/api';
 
+export const MAX_QUANTITY_PER_ITEM = 5;
+
 export interface BakeryItemCardProps {
   item: BakeryItemDto;
   onSelect?: (item: BakeryItemDto) => void;
@@ -15,6 +17,7 @@ export const BakeryItemCard: React.FC<BakeryItemCardProps> = ({
   onQuantityChange,
 }) => {
   const isOutOfStock = item.stockQuantity <= 0;
+  const maxOrderQuantity = Math.min(item.stockQuantity, MAX_QUANTITY_PER_ITEM);
   const formattedPrice = `฿${(item.price / 100).toFixed(2)}`;
 
   return (
@@ -40,12 +43,20 @@ export const BakeryItemCard: React.FC<BakeryItemCardProps> = ({
               Out of Stock / สินค้าหมดชั่วคราว
             </span>
           ) : (
-            <span
-              data-testid="badge-in-stock"
-              className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
-            >
-              In Stock: {item.stockQuantity}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              <span
+                data-testid="badge-in-stock"
+                className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
+              >
+                In Stock: {item.stockQuantity}
+              </span>
+              <span
+                data-testid="badge-max-per-item"
+                className="inline-block px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200/70"
+              >
+                Max 5 per item
+              </span>
+            </div>
           )}
         </div>
 
@@ -82,8 +93,10 @@ export const BakeryItemCard: React.FC<BakeryItemCardProps> = ({
             </span>
             <button
               type="button"
-              disabled={isOutOfStock || selectedQuantity >= item.stockQuantity}
-              onClick={() => onQuantityChange(selectedQuantity + 1)}
+              disabled={isOutOfStock || selectedQuantity >= maxOrderQuantity}
+              onClick={() =>
+                onQuantityChange(Math.min(maxOrderQuantity, selectedQuantity + 1))
+              }
               className="w-8 h-8 rounded-lg border border-stone-300 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-bold text-stone-700"
             >
               +
