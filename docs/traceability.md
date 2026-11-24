@@ -2,7 +2,7 @@
 
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
-> **Document Version:** `1.1.0` (Lab 7 `CR-01` Maintenance Revision — Pre-Implementation Contract Gate)  
+> **Document Version:** `1.1.1` (Lab 7 `CR-01` Released — Verified at `v2.0.1-lab7` / `b80a0d0`)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
@@ -12,6 +12,7 @@
 |---|---|---|---|
 | `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial Requirements Traceability Matrix mapping `FR-01`–`FR-09`, `BR-01`–`BR-07`, and `NFR-01`–`NFR-06`. |
 | `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Added `CR-01` traceability for revised `BR-03` & `FR-03-01` (`AC-CR01-01`..`AC-CR01-06` → `CR01-01..06`, `CR01-UI-01..02`, `E2E-CR01-01`) and recorded intended revision of `ORD-08` (L429). |
+| `1.1.1` | 2026-11-24 | Lab 7 Release (`#75` / `#76`, `v2.0.1-lab7`) | Synced final verified release tag `v2.0.1-lab7` (annotated tag `933488a` → `main` commit `b80a0d0`, Cloud Run revision `crustcraft-00012-4dq`, `137/137` automated tests passing). |
 
 ---
 
