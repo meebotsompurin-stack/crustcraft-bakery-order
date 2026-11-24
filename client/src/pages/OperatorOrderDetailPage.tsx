@@ -4,15 +4,58 @@ import {
   getOperatorOrderByIdApi,
   updateOperatorOrderStatusApi,
   type OrderResponse,
+  type OrderStatus,
 } from '../services/api';
+import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
+import { SimulatedPaymentCard } from '../components/SimulatedPaymentCard';
+
+const STATUS_BADGE_CLASSES: Record<OrderStatus, string> = {
+  PENDING: 'bg-amber-100 text-amber-800 border border-amber-300',
+  ACCEPTED: 'bg-blue-100 text-blue-800 border border-blue-300',
+  BAKING: 'bg-orange-100 text-orange-800 border border-orange-300',
+  READY_FOR_PICKUP: 'bg-purple-100 text-purple-800 border border-purple-300',
+  COMPLETED: 'bg-emerald-100 text-emerald-800 border border-emerald-300',
+  CANCELLED: 'bg-rose-100 text-rose-800 border border-rose-300',
+};
+
+const NEXT_STEP_CONFIG: Partial<
+  Record<OrderStatus, { nextStatus: OrderStatus; label: string; pendingLabel: string; buttonClass: string }>
+> = {
+  PENDING: {
+    nextStatus: 'ACCEPTED',
+    label: 'Accept Order',
+    pendingLabel: 'Accepting...',
+    buttonClass: 'bg-amber-600 hover:bg-amber-700 active:bg-amber-800',
+  },
+  ACCEPTED: {
+    nextStatus: 'BAKING',
+    label: 'Start Baking',
+    pendingLabel: 'Updating...',
+    buttonClass: 'bg-orange-600 hover:bg-orange-700 active:bg-orange-800',
+  },
+  BAKING: {
+    nextStatus: 'READY_FOR_PICKUP',
+    label: 'Mark Ready for Pickup',
+    pendingLabel: 'Updating...',
+    buttonClass: 'bg-purple-600 hover:bg-purple-700 active:bg-purple-800',
+  },
+  READY_FOR_PICKUP: {
+    nextStatus: 'COMPLETED',
+    label: 'Mark Completed',
+    pendingLabel: 'Completing...',
+    buttonClass: 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800',
+  },
+};
 
 export const OperatorOrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isAccepting, setIsAccepting] = useState<boolean>(false);
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [confirmingCancel, setConfirmingCancel] = useState<boolean>(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const fetchOrderDetail = async (orderId: string) => {
     try {
@@ -34,20 +77,30 @@ export const OperatorOrderDetailPage: React.FC = () => {
     }
   }, [id]);
 
-  const handleAccept = async () => {
+  const handleStatusUpdate = async (nextStatus: OrderStatus) => {
     if (!order) return;
     try {
       setActionError(null);
-      setIsAccepting(true);
-      const data = await updateOperatorOrderStatusApi(order.id, 'ACCEPTED');
+      setActionSuccess(null);
+      setIsUpdating(true);
+      const data = await updateOperatorOrderStatusApi(order.id, nextStatus);
       setOrder(data.order);
+      setConfirmingCancel(false);
+      if (nextStatus === 'CANCELLED') {
+        setActionSuccess('Order cancelled and reserved inventory has been restored.');
+      } else {
+        setActionSuccess(`Order status updated to ${nextStatus}.`);
+      }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to accept order';
+      const msg =
+        err instanceof Error ? err.message : 'Failed to update order status';
       setActionError(msg);
     } finally {
-      setIsAccepting(false);
+      setIsUpdating(false);
     }
   };
+
+  const nextStep = order ? NEXT_STEP_CONFIG[order.status] : undefined;
 
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-8 py-8">
@@ -71,6 +124,22 @@ export const OperatorOrderDetailPage: React.FC = () => {
             type="button"
             onClick={() => setActionError(null)}
             className="text-red-600 hover:text-red-900 text-xs font-bold ml-4"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {actionSuccess && (
+        <div
+          role="status"
+          className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm flex items-center justify-between"
+        >
+          <span>{actionSuccess}</span>
+          <button
+            type="button"
+            onClick={() => setActionSuccess(null)}
+            className="text-emerald-700 hover:text-emerald-900 text-xs font-bold ml-4"
           >
             ✕
           </button>
@@ -106,19 +175,19 @@ export const OperatorOrderDetailPage: React.FC = () => {
           {/* Order Header */}
           <div className="p-6 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-stone-50/50">
             <div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <h1 className="text-xl font-bold text-stone-900">
                   Order #{order.id.slice(-8)}
                 </h1>
                 <span
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                    order.status === 'PENDING'
-                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                      : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    STATUS_BADGE_CLASSES[order.status] ||
+                    'bg-stone-100 text-stone-700 border border-stone-300'
                   }`}
                 >
                   {order.status}
                 </span>
+                <PaymentStatusBadge status={order.paymentStatus} />
               </div>
               <p className="text-xs text-stone-500 mt-1 font-mono">
                 Full ID: {order.id}
@@ -128,21 +197,57 @@ export const OperatorOrderDetailPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Accept Button in Header */}
-            <div>
-              {order.status === 'PENDING' ? (
+            {/* Fulfillment & Cancel Controls in Header */}
+            <div className="flex flex-wrap items-center gap-2">
+              {nextStep ? (
                 <button
                   type="button"
-                  disabled={isAccepting}
-                  onClick={handleAccept}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition shadow-sm"
+                  disabled={isUpdating}
+                  onClick={() => handleStatusUpdate(nextStep.nextStatus)}
+                  className={`w-full sm:w-auto px-5 py-2.5 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition shadow-sm ${nextStep.buttonClass}`}
                 >
-                  {isAccepting ? 'Accepting...' : 'Accept Order'}
+                  {isUpdating ? nextStep.pendingLabel : nextStep.label}
                 </button>
-              ) : (
+              ) : order.status === 'COMPLETED' ? (
                 <span className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-semibold">
-                  Accepted ✓
+                  Completed ✓
                 </span>
+              ) : (
+                <span className="inline-flex items-center px-4 py-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-sm font-semibold">
+                  Cancelled
+                </span>
+              )}
+
+              {order.status === 'PENDING' && !confirmingCancel && (
+                <button
+                  type="button"
+                  disabled={isUpdating}
+                  onClick={() => setConfirmingCancel(true)}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-rose-300 bg-white hover:bg-rose-50 disabled:opacity-50 text-rose-700 text-sm font-semibold transition"
+                >
+                  Cancel Order
+                </button>
+              )}
+
+              {order.status === 'PENDING' && confirmingCancel && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() => handleStatusUpdate('CANCELLED')}
+                    className="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-semibold transition"
+                  >
+                    {isUpdating ? 'Cancelling...' : 'Confirm Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isUpdating}
+                    onClick={() => setConfirmingCancel(false)}
+                    className="px-3 py-2 rounded-lg border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 text-xs font-semibold transition"
+                  >
+                    Keep Order
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -228,6 +333,13 @@ export const OperatorOrderDetailPage: React.FC = () => {
                 </tfoot>
               </table>
             </div>
+
+            {/* Operator Payment Controls */}
+            <SimulatedPaymentCard
+              mode="OPERATOR"
+              order={order}
+              onOrderUpdated={setOrder}
+            />
           </div>
         </div>
       )}

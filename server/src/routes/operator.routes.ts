@@ -6,6 +6,12 @@ import {
   getOrderByIdHandler,
   updateOrderStatusHandler,
 } from '../controllers/operator.controller';
+import { updateOperatorPaymentHandler } from '../controllers/payment.controller';
+import {
+  getOperatorCatalogHandler,
+  createOperatorCatalogItemHandler,
+  updateOperatorCatalogItemHandler,
+} from '../controllers/catalogAdmin.controller';
 
 export const operatorRouter = Router();
 
@@ -14,3 +20,8 @@ operatorRouter.use(authenticate, requireRole(['OPERATOR']));
 operatorRouter.get('/orders', getOrdersHandler);
 operatorRouter.get('/orders/:id', getOrderByIdHandler);
 operatorRouter.patch('/orders/:id/status', updateOrderStatusHandler);
+operatorRouter.patch('/orders/:id/payment', updateOperatorPaymentHandler);
+
+operatorRouter.get('/catalog', getOperatorCatalogHandler);
+operatorRouter.post('/catalog', createOperatorCatalogItemHandler);
+operatorRouter.patch('/catalog/:id', updateOperatorCatalogItemHandler);

@@ -3,15 +3,34 @@ import {
   getOperatorOrdersApi,
   updateOperatorOrderStatusApi,
   type OrderResponse,
+  type OrderStatus,
 } from '../services/api';
 import { OperatorOrderRow } from '../components/OperatorOrderRow';
+
+const STATUS_PRIORITY: Record<OrderStatus, number> = {
+  PENDING: 0,
+  ACCEPTED: 1,
+  BAKING: 2,
+  READY_FOR_PICKUP: 3,
+  COMPLETED: 4,
+  CANCELLED: 5,
+};
+
+function sortOperatorOrders(orders: OrderResponse[]): OrderResponse[] {
+  return [...orders].sort((a, b) => {
+    const pA = STATUS_PRIORITY[a.status] ?? 99;
+    const pB = STATUS_PRIORITY[b.status] ?? 99;
+    if (pA !== pB) return pA - pB;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
 
 export const OperatorOrderQueuePage: React.FC = () => {
   const [orders, setOrders] = useState<OrderResponse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const fetchOrders = async () => {
     try {
@@ -20,7 +39,8 @@ export const OperatorOrderQueuePage: React.FC = () => {
       const data = await getOperatorOrdersApi();
       setOrders(data.orders);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load operator orders';
+      const msg =
+        err instanceof Error ? err.message : 'Failed to load operator orders';
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -31,21 +51,23 @@ export const OperatorOrderQueuePage: React.FC = () => {
     fetchOrders();
   }, []);
 
-  const handleAcceptOrder = async (orderId: string) => {
+  const handleUpdateStatus = async (orderId: string, nextStatus: OrderStatus) => {
     try {
       setActionError(null);
-      setAcceptingId(orderId);
-      const res = await updateOperatorOrderStatusApi(orderId, 'ACCEPTED');
+      setUpdatingId(orderId);
+      const res = await updateOperatorOrderStatusApi(orderId, nextStatus);
 
-      // Update state in-place without full page reload (AC-05-11)
       setOrders((prev) =>
-        prev.map((order) => (order.id === orderId ? res.order : order))
+        sortOperatorOrders(
+          prev.map((order) => (order.id === orderId ? res.order : order))
+        )
       );
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to accept order';
+      const msg =
+        err instanceof Error ? err.message : 'Failed to update order status';
       setActionError(msg);
     } finally {
-      setAcceptingId(null);
+      setUpdatingId(null);
     }
   };
 
@@ -142,8 +164,8 @@ export const OperatorOrderQueuePage: React.FC = () => {
             <OperatorOrderRow
               key={order.id}
               order={order}
-              onAcceptOrder={handleAcceptOrder}
-              isAccepting={acceptingId === order.id}
+              onUpdateStatus={handleUpdateStatus}
+              isUpdating={updatingId === order.id}
             />
           ))}
         </div>

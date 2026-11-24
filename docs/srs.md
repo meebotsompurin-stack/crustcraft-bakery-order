@@ -4,7 +4,7 @@
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **Department:** Department of Computer Engineering, Faculty of Engineering, King Mongkut's University of Technology Thonburi (KMUTT)  
 > **Assigned Project Theme:** Theme 4 — E-Commerce or Ordering System  
-> **Document Version:** `1.1.0` (Lab 7 `CR-01` Maintenance Revision — Pre-Implementation Contract Gate)  
+> **Document Version:** `2.0.1` (Sprint 2 Baseline Sync + Lab 7 `CR-01` Maintenance Revision — updated for Lab 5 PostgreSQL/Cloud Run, Lab 6 `#58` `pickupNote` validation, Sprint 2/3 Contracts, and Lab 7 `CR-01` max 5 quantity cap)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
@@ -14,6 +14,8 @@
 |---|---|---|---|
 | `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial System Requirements Specification covering `F-01`–`F-09`, `BR-01`–`BR-07`, and `NFR-01`–`NFR-06`. |
 | `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Revised `BR-03` and `FR-03-01` to enforce per-item order quantity cap (`1 <= quantity <= 5`, `MAX_QUANTITY_PER_ITEM = 5`), duplicate `bakeryItemId` rejection (`400 VALIDATION_ERROR`), and `400`-before-`409` error precedence while preserving all existing invariants (`BR-01`, `BR-02`, `BR-03` atomicity, `BR-04`–`BR-07`, Lab 6 `#58`). Approved by TA Section 131 on 2026-11-24. |
+| `2.0.0` | 2026-11-24 | Sprint 2 Baseline (`v2.0.0-sprint2`, `#61`–`#63`) | Synced baseline for Lab 5 PostgreSQL 16 / Cloud Run, Lab 6 `#58` `pickupNote` 500-char validation, and Sprint 2/3 contracts (`F-05`–`F-09`). |
+| `2.0.1` | 2026-11-24 | Lab 7 Release Sync (`v2.0.1-lab7`, `#75`) | Integrated Lab 7 `CR-01` (`v1.1.0`) with Sprint 2 (`v2.0.0-sprint2`). |
 
 ---
 
@@ -115,7 +117,7 @@ CrustCraft enforces six foundational business rules across all architectural lay
 * **FR-02-04:** The frontend catalog shall render bakery items with formatted prices in Thai Baht (`฿(price / 100).toFixed(2)`), remaining stock count, and visual availability badges (including `"Out of Stock"` / `"สินค้าหมดชั่วคราว"` when `stockQuantity == 0`).
 
 ### 4.3 Customer Pre-Order Processing (`F-03`)
-* **FR-03-01 (Revised in v1.1.0 / `CR-01`):** The system shall allow authenticated customers to submit pre-orders (`POST /api/customer/orders`) with unique `bakeryItemId` line items where each integer `quantity` satisfies **`1 <= quantity <= 5`** (`MAX_QUANTITY_PER_ITEM = 5`) and an optional `pickupNote` (maximum 500 characters per Lab 6 `#58`). Requests containing `quantity > 5` or duplicate `bakeryItemId` entries shall be rejected with `400 VALIDATION_ERROR` (taking precedence over `409 CONFLICT` stock checks) with indexed `details[].field` references, and the frontend order UI shall cap item selection at `Math.min(stockQuantity, 5)` with a `"Max 5 per item"` notice.
+* **FR-03-01 (Revised in v1.1.0 / `CR-01` & v2.0.1):** The system shall allow authenticated customers to submit pre-orders (`POST /api/customer/orders`) with unique `bakeryItemId` line items where each integer `quantity` satisfies **`1 <= quantity <= 5`** (`MAX_QUANTITY_PER_ITEM = 5`) and an optional `pickupNote` (maximum **500 characters**; inputs exceeding 500 characters are rejected with `400 VALIDATION_ERROR` — enforced since Lab 6 Defect `#58`). Requests containing `quantity > 5` or duplicate `bakeryItemId` entries shall be rejected with `400 VALIDATION_ERROR` (taking precedence over `409 CONFLICT` stock checks) with indexed `details[].field` references, and the frontend order UI shall cap item selection at `Math.min(stockQuantity, 5)` with a `"Max 5 per item"` notice.
 * **FR-03-02:** The server shall compute line item subtotals and overall order `totalAmount` in integer satangs from database item prices, strictly disregarding any client-sent price values (`BR-01`).
 * **FR-03-03:** The system shall snapshot the current `price` into `OrderItem.unitPriceAtOrder` for every line item (`BR-02`).
 * **FR-03-04:** The system shall validate stock and atomically deduct `stockQuantity` within a `prisma.$transaction` block (`BR-03`).
@@ -169,7 +171,7 @@ The following matrix defines conceptual operational privileges across user roles
 | Cancel Pre-Order | `Order.status` | ❌ | ✔ (Own `PENDING`) | ✔ (`PENDING`) | Permitted only while `PENDING`; atomically restores inventory (`BR-07`, Sprint 2). |
 | Manage Menu Items | `BakeryItem` | ❌ | ❌ | ✔ | Create/edit bakery items, adjust prices, and toggle `isAvailable` (Sprint 2). |
 | Restock Item Inventory | `BakeryItem` | ❌ | ❌ | ✔ | Batch replenishment of `stockQuantity` (Sprint 2). |
-| Update Payment State | `Order.paymentStatus`| ❌ | ❌ | ✔ | Transition `UNPAID` → `PAID` / `FAILED` using synthetic controls (Sprint 2). |
+| Update Payment State | `Order.paymentStatus`| ❌ | ✔ (Own non-cancelled) | ✔ (Non-cancelled) | Transition `UNPAID` / `FAILED` → `PAID` / `FAILED` using synthetic controls; blocked (`409`) on `CANCELLED` orders (`F-07`, Sprint 2). |
 | View Sales Analytics | Reports / Metrics | ❌ | ❌ | ✔ | Aggregated store revenue and fulfillment throughput summaries (Sprint 3). |
 
 ---
@@ -182,7 +184,7 @@ The following matrix defines conceptual operational privileges across user roles
 | **NFR-02** | Security | User passwords shall never be persisted in plaintext, and session tokens must be shielded from cross-site scripting (XSS). | Passwords hashed using `bcrypt` with salt rounds `≥ 10`. JWT issued in `httpOnly`, `SameSite=Lax` cookie. Verified by unit and API test assertions. | Sprint 1 |
 | **NFR-03** | Security | All API error responses must adhere to a secure standard error envelope without leaking server stack traces. | Response body matches `{ error: { code, message, details? } }` with appropriate HTTP status (`400`, `401`, `403`, `404`, `409`). Verified by API integration tests. | Sprint 1 |
 | **NFR-04** | Usability & Responsive | The web user interface shall be fully functional and visually ergonomic across desktop, tablet, and mobile viewport widths. | Zero horizontal scroll and complete DOM interaction at `1280px` (Desktop), `768px` (Tablet), and `375px` (Mobile). Verified by Playwright multi-viewport tests. | Sprint 1 |
-| **NFR-05** | Reliability & Persistence | Production database records must survive container destruction, application redeployment, and service restarts without data loss (Course Spec 5.1). | Database file mounted on external persistent volume (`/app/data/crustcraft.db` on GCP persistent disk). Validated during container lifecycle tests in Lab 5. | Sprint 1 (Design) / Lab 5 |
+| **NFR-05** | Reliability & Persistence | Production database records must survive container destruction, application redeployment, and service restarts without data loss (Course Spec 5.1). | Managed **PostgreSQL 16 (GCP Cloud SQL)** in production and `postgres:16-alpine` persistent volume locally via Docker Compose (`prisma migrate deploy`). Validated in Lab 5 (`C-05`). | Sprint 1 (Design) / Lab 5 (Verified) |
 | **NFR-06** | Data Integrity | Monetary transactions must avoid floating-point rounding discrepancies. | All pricing stored and calculated as integers (`satang`). Verified by calculation unit tests (`server/src/__tests__/unit/orderCalculation.test.ts`). | Sprint 1 |
 
 ---
@@ -191,7 +193,7 @@ The following matrix defines conceptual operational privileges across user roles
 
 ### 7.1 Technical Constraints
 1. **Academic Framework Constraints:** Project development is bounded by the KMUTT CPE 334 semester schedule, mandating three incremental deliverables (Deliverable 1 due 8 Nov 2026, Deliverable 2 due 29 Nov 2026, Final Delivery due 13 Dec 2026) alongside three group labs (Lab 5 GCP/Docker, Lab 6 UAT, Lab 7 Maintenance).
-2. **Modular Monolith Stack:** Single unified repository with distinct layers: Express.js (TypeScript) backend in `server/`, React (Vite + TypeScript + Tailwind CSS) in `client/`, Prisma ORM with SQLite (local) / PostgreSQL (production capability) in `prisma/`, and Playwright in `e2e/`.
+2. **Modular Monolith Stack:** Single unified repository with distinct layers: Express.js (TypeScript) backend in `server/`, React (Vite + TypeScript + Tailwind CSS) in `client/`, Prisma ORM with PostgreSQL 16 (`postgres:16-alpine` locally/CI and GCP Cloud SQL in production — migrated from Sprint 1 SQLite in Lab 5) in `prisma/`, and Playwright in `e2e/`.
 
 ### 7.2 Architectural Assumptions & Resolutions
 - **Currency Assumption:** All business operations occur in Thailand; currency is Thai Baht (THB). Storing prices in integer satang (`Int`) eliminates fractional cent ambiguities.

@@ -1,4 +1,5 @@
 import { prisma } from '../lib/db';
+import type { PaymentStatus } from '../lib/orderStatus';
 import { AppError } from './auth.service';
 
 export const MAX_QUANTITY_PER_ITEM = 5;
@@ -49,6 +50,7 @@ export interface OrderDto {
     email: string;
   };
   status: string;
+  paymentStatus: PaymentStatus;
   totalAmount: number;
   pickupNote: string | null;
   items: OrderItemDto[];
@@ -313,6 +315,7 @@ export async function createCustomerOrder(
     id: createdOrder.id,
     customerId: createdOrder.customerId,
     status: createdOrder.status,
+    paymentStatus: createdOrder.paymentStatus as PaymentStatus,
     totalAmount: createdOrder.totalAmount,
     pickupNote: createdOrder.pickupNote,
     items: createdOrder.items.map((i) => ({
@@ -363,6 +366,7 @@ export async function getCustomerOrders(
     id: order.id,
     customerId: order.customerId,
     status: order.status,
+    paymentStatus: order.paymentStatus as PaymentStatus,
     totalAmount: order.totalAmount,
     pickupNote: order.pickupNote,
     items: order.items.map((i) => ({
@@ -426,6 +430,7 @@ export async function getCustomerOrderById(
     id: order.id,
     customerId: order.customerId,
     status: order.status,
+    paymentStatus: order.paymentStatus as PaymentStatus,
     totalAmount: order.totalAmount,
     pickupNote: order.pickupNote,
     items: order.items.map((i) => ({
@@ -443,5 +448,113 @@ export async function getCustomerOrderById(
     })),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * Cancels an owning customer's PENDING order and atomically restores
+ * every line item's quantity back to BakeryItem.stockQuantity (BR-03, BR-04, BR-07).
+ */
+export async function cancelCustomerOrder(
+  orderId: string,
+  customerId: string
+): Promise<OrderDto> {
+  const existingOrder = await prisma.order.findUnique({
+    where: { id: orderId },
+  });
+
+  if (!existingOrder) {
+    throw new AppError(404, 'NOT_FOUND', 'Order not found');
+  }
+
+  if (existingOrder.customerId !== customerId) {
+    throw new AppError(
+      403,
+      'FORBIDDEN',
+      'You do not have permission to cancel this order.'
+    );
+  }
+
+  if (existingOrder.status !== 'PENDING') {
+    throw new AppError(
+      409,
+      'CONFLICT',
+      `Cannot cancel order in ${existingOrder.status} status. Only PENDING orders can be cancelled.`
+    );
+  }
+
+  const cancelledOrder = await prisma.$transaction(async (tx) => {
+    const result = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        customerId,
+        status: 'PENDING',
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+
+    if (result.count === 0) {
+      throw new AppError(
+        409,
+        'CONFLICT',
+        'Order was already cancelled or updated concurrently.'
+      );
+    }
+
+    const orderItems = await tx.orderItem.findMany({
+      where: { orderId },
+    });
+
+    for (const item of orderItems) {
+      await tx.bakeryItem.update({
+        where: { id: item.bakeryItemId },
+        data: {
+          stockQuantity: { increment: item.quantity },
+        },
+      });
+    }
+
+    return tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            bakeryItem: {
+              select: {
+                id: true,
+                name: true,
+                category: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  return {
+    id: cancelledOrder.id,
+    customerId: cancelledOrder.customerId,
+    status: cancelledOrder.status,
+    paymentStatus: cancelledOrder.paymentStatus as PaymentStatus,
+    totalAmount: cancelledOrder.totalAmount,
+    pickupNote: cancelledOrder.pickupNote,
+    items: cancelledOrder.items.map((i) => ({
+      id: i.id,
+      bakeryItemId: i.bakeryItemId,
+      bakeryItem: i.bakeryItem
+        ? {
+            id: i.bakeryItem.id,
+            name: i.bakeryItem.name,
+            category: i.bakeryItem.category,
+          }
+        : undefined,
+      quantity: i.quantity,
+      unitPriceAtOrder: i.unitPriceAtOrder,
+    })),
+    createdAt: cancelledOrder.createdAt.toISOString(),
+    updatedAt: cancelledOrder.updatedAt.toISOString(),
   };
 }
