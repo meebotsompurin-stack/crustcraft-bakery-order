@@ -2,8 +2,8 @@
 
 > **GitHub Issue:** [#76](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/76)  
 > **Wave:** 3 (Post-Deployment Metrics, Readiness Assessment & Final PDF Submission)  
-> **Depends on:** `#75` (`LAB7-ISSUE-02`) merged to `main`, tagged `v2.0.1-lab7`, and verified live on GCP Cloud Run  
-> **Branch:** `docs/lab7-issue-03-metrics-readiness-report` → `main` *(isolated from `sprint-2-staging`)*  
+> **Depends on:** `#75` (`LAB7-ISSUE-02`) merged via `lab-7-staging` → `main`, tagged `v2.0.1-lab7`, and verified live on GCP Cloud Run  
+> **Branch:** `docs/lab7-issue-03-metrics-readiness-report` → `lab-7-staging` *(→ `main` after final review; isolated from `sprint-2-staging`)*  
 > **Assignees:** `@meebotsompurin-stack`, `@poom2548` *(Pair)* | **Reviewer:** Peer Cross-Check
 
 ---

@@ -5,6 +5,7 @@
 > **Co-Developers:**
 > - **Repo Owner:** Purin Mebotsom (`67070507214`, GitHub: `@meebotsompurin-stack`)
 > - **Co-Developer:** Saksorn Buranatananun (`67070507208`, GitHub: `@poom2548`)
+> **Base Integration Branch:** `lab-7-staging` (branched from `origin/main` at `c876686` including Lab 5 & Lab 6 `#58` fix)  
 > **Change Request:** `CR-01` — Modify Sprint 1 `BR-03` / `FR-03-01` (`F-03: Customer Pre-Order Creation`) to enforce **`1 <= quantity <= 5`** (`MAX_QUANTITY_PER_ITEM = 5`) per bakery item per order  
 > **TA Approval:** Approved by **นายรัตนโชติ เพ็ชรพันธ์ศรี (พี่ลูกหมู) — TA Section 131** on **24 November 2026, 15:07 (+07)** ([`CHANGE_REQUEST_PROPOSAL.md`](../../docs/labs/lab-07/CHANGE_REQUEST_PROPOSAL.md), [`ta-approval-email-2.jpg`](../../docs/labs/lab-07/ta-approval-email-2.jpg), [`ta-approval-email-1.jpg`](../../docs/labs/lab-07/ta-approval-email-1.jpg))  
 > **Baseline Chain:** `v1.0.0-sprint1` (`ebcf83b`) → Lab 6 `main` (`c876686`) → Planned Pre-Change `v2.0.0-sprint2` → Target Lab 7 Release `v2.0.1-lab7`  
@@ -15,32 +16,34 @@
 
 ## 1. Wave Execution Order (Wave 0 Plan + 3 Lab 7 Delivery Issues)
 
-> **Branch Isolation Rule (TA Condition #4):** `1 Issue = 1 Branch = 1 Reviewed PR → main` (strictly isolated from `sprint-2-staging` and Sprint 2 feature PRs).  
-> **Release Guard (`v2.0.0-sprint2` First):** Do **NOT** merge any Lab 7 PR into `main` until standalone Sprint 2 Release 1 (`v2.0.0-sprint2`) is merged and tagged on `main`. Once `v2.0.0-sprint2` is tagged, rebase Lab 7 branches onto `main` (`v2.0.0-sprint2`) so the pre-change baseline and the `v2.0.1-lab7` maintenance release remain cleanly separated in Git history.  
-> **Hard Stop 1 (TA Approval & Plan Alignment):** `LAB7-ISSUE-00` (`#73`) records TA approval screenshots in GitHub Issue `#73` and `docs/labs/lab-07/` and establishes the Wave plan before Contract Revision begins.  
-> **Hard Stop 2 (Contract Before Code — Part A):** `LAB7-ISSUE-01` (`#74`) MUST be substantively reviewed and merged **before** any implementation commits in `LAB7-ISSUE-02` (`#75`) so Git timestamps prove impact analysis and revised contracts predated code.  
+> **Branch Isolation Rule (TA Condition #4):** `1 Issue = 1 Branch = 1 Reviewed PR → lab-7-staging` (strictly isolated from `sprint-2-staging` and Sprint 2 feature PRs), followed by a reviewed Release PR (`lab-7-staging` → `main`) tagged `v2.0.1-lab7`.  
+> **Hard Stop 1 (TA Approval, Plan & CI Gate):** `LAB7-ISSUE-00` (`#73`) merges into `lab-7-staging` first so both teammates approve the plan, archive TA approval screenshots in `#73` and `docs/labs/lab-07/`, and enable CI (`test-and-docker`) on PRs targeting `lab-7-staging`.  
+> **Hard Stop 2 (Contract Before Code — Part A):** `LAB7-ISSUE-01` (`#74`) MUST be substantively reviewed and merged into `lab-7-staging` **before** any implementation commits in `LAB7-ISSUE-02` (`#75`) so Git timestamps prove impact analysis and revised contracts predated code.  
+> **Release Sync Gate (`v2.0.0-sprint2` Before Wave 2 Code & Release):** Once standalone Sprint 2 Release 1 (`v2.0.0-sprint2`) is tagged on `main`, sync `main` (`v2.0.0-sprint2`) into `lab-7-staging` so the pre-change codebase reflects the latest release before running Wave 2 RED→GREEN (`#75`) and opening the Release PR `lab-7-staging` → `main` (`v2.0.1-lab7`).  
 > **Hard Stop 3 (TDD RED Before GREEN — Part B):** In `LAB7-ISSUE-02` (`#75`), failing tests (`CR01-01..06`, `CR01-UI-01..02`, `E2E-CR01-01`) MUST be committed and executed against the pre-change implementation (`RED`) before the implementation commit (`GREEN`).
 
-| Wave | Issue Code | GitHub Issue | Branch | Assignee (Dev) | Reviewer | Parallel-Safe? | Lab 7 Coverage |
-|:---:|---|:---:|---|---|---|---|---|
-| **0** | [`LAB7-ISSUE-00`](./LAB7-ISSUE-00.md) | [#73](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/73) | `chore/lab7-issue-00-plan-and-approval` | `@meebotsompurin-stack` | `@poom2548` | ❌ Base Plan & Approval | TA Approval Record & Lab 7 Master Plan |
-| **1** | [`LAB7-ISSUE-01`](./LAB7-ISSUE-01.md) | [#74](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/74) | `docs/lab7-issue-01-impact-and-contract` | `@poom2548` | `@meebotsompurin-stack` | ❌ Contract before Code | Part A (25 pts): Impact Analysis, Revised SRS/SDS/API/UI/STS & Pre-Code Review |
-| **2** | [`LAB7-ISSUE-02`](./LAB7-ISSUE-02.md) | [#75](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/75) | `feat/lab7-issue-02-max-qty-cap` | `@meebotsompurin-stack` | `@poom2548` | ❌ After Part A Merge | Part B (50 pts): RED→GREEN Implementation, Regression, `v2.0.1-lab7` & Cloud Run Verification |
-| **3** | [`LAB7-ISSUE-03`](./LAB7-ISSUE-03.md) | [#76](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/76) | `docs/lab7-issue-03-metrics-readiness-report` | `@meebotsompurin-stack`, `@poom2548` *(Pair)* | Peer Cross-Check | ❌ After `v2.0.1-lab7` Deploy | Parts C & D (25 pts): 5 Objective Metrics, Release Readiness, Retrospective & Lab 7 PDF |
+| Wave | Issue Code | GitHub Issue | Branch | Target | Assignee (Dev) | Reviewer | Parallel-Safe? | Lab 7 Coverage |
+|:---:|---|:---:|---|---|---|---|---|---|
+| **0** | [`LAB7-ISSUE-00`](./LAB7-ISSUE-00.md) | [#73](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/73) | `chore/lab7-issue-00-plan-and-approval` | `lab-7-staging` | `@meebotsompurin-stack` | `@poom2548` | ❌ Base Plan & CI | TA Approval Record, Master Plan & `lab-7-staging` CI Trigger |
+| **1** | [`LAB7-ISSUE-01`](./LAB7-ISSUE-01.md) | [#74](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/74) | `docs/lab7-issue-01-impact-and-contract` | `lab-7-staging` | `@poom2548` | `@meebotsompurin-stack` | ❌ Contract before Code | Part A (25 pts): Impact Analysis, Revised SRS/SDS/API/UI/STS & Pre-Code Review |
+| **2** | [`LAB7-ISSUE-02`](./LAB7-ISSUE-02.md) | [#75](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/75) | `feat/lab7-issue-02-max-qty-cap` | `lab-7-staging` | `@meebotsompurin-stack` | `@poom2548` | ❌ After Part A & `v2.0.0-sprint2` Sync | Part B (50 pts): RED→GREEN Implementation, Regression, `v2.0.1-lab7` & Cloud Run Verification |
+| **3** | [`LAB7-ISSUE-03`](./LAB7-ISSUE-03.md) | [#76](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/76) | `docs/lab7-issue-03-metrics-readiness-report` | `lab-7-staging` | `@meebotsompurin-stack`, `@poom2548` *(Pair)* | Peer Cross-Check | ❌ After `v2.0.1-lab7` Deploy | Parts C & D (25 pts): 5 Objective Metrics, Release Readiness, Retrospective & Lab 7 PDF |
 
-### Merge & Release Order (Isolated from `sprint-2-staging`)
+### Merge & Release Order (Dedicated `lab-7-staging` Integration Branch)
 ```text
-Prerequisite Gate (Sprint 2 Release 1):
-          sprint-2-staging → main (Reviewed Release PR, Tag v2.0.0-sprint2)  [Pre-Change Baseline]
+Wave 0:   #73 (chore/lab7-issue-00-plan-and-approval)     → lab-7-staging  [TA Approval Evidence, Plan & CI Trigger]
              ↓
-Wave 0:   #73 (chore/lab7-issue-00-plan-and-approval)     → main  [TA Approval Evidence & Master Plan]
+Wave 1:   #74 (docs/lab7-issue-01-impact-and-contract)    → lab-7-staging  [Part A Hard Stop: Contract Review Before Code!]
              ↓
-Wave 1:   #74 (docs/lab7-issue-01-impact-and-contract)    → main  [Part A Hard Stop: Contract Review Before Code!]
+Pre-Change Baseline Sync (Once Sprint 2 Release 1 lands on main):
+          main (v2.0.0-sprint2)                           → lab-7-staging  [Sync pre-change code to latest release]
              ↓
-Wave 2:   #75 (feat/lab7-issue-02-max-qty-cap)            → main  [Part B: RED Commit → GREEN Commit → CI Green]
-          Tag v2.0.1-lab7 on main → Lab 5 CD Auto-Deploy to GCP Cloud Run → Post-Deploy Changed + Preserved Checks
+Wave 2:   #75 (feat/lab7-issue-02-max-qty-cap)            → lab-7-staging  [Part B: RED Commit → GREEN Commit → CI Green]
              ↓
-Wave 3:   #76 (docs/lab7-issue-03-metrics-readiness-report) → main  [Parts C & D: 5 Dated Metrics, Readiness & Lab 7 PDF]
+Lab 7 Release PR (Part B Deployment Gate):
+          lab-7-staging → main (Reviewed Release PR, Tag v2.0.1-lab7 → GCP Cloud Run Auto-Deploy & Post-Deploy Checks)
+             ↓
+Wave 3:   #76 (docs/lab7-issue-03-metrics-readiness-report) → lab-7-staging → main  [Parts C & D: 5 Metrics, Readiness & Lab 7 PDF]
 ```
 
 ---
@@ -60,6 +63,7 @@ Wave 3:   #76 (docs/lab7-issue-03-metrics-readiness-report) → main  [Parts C &
 
 | File / Directory | `#73` (`LAB7-ISSUE-00`) | `#74` (`LAB7-ISSUE-01`) | `#75` (`LAB7-ISSUE-02`) | `#76` (`LAB7-ISSUE-03`) |
 |---|:---:|:---:|:---:|:---:|
+| `.github/workflows/ci-docker.yml` | ✅ owns | ❌ | ❌ | ❌ |
 | `docs/labs/lab-07/CHANGE_REQUEST_PROPOSAL.md`, `ta-approval-email-*.jpg` | ✅ owns | ❌ | ❌ | ❌ |
 | `plan/lab7-issues/*` | ✅ owns | ❌ | ❌ | ❌ |
 | `docs/labs/lab-07/impact-and-contract-review.md` | ❌ | ✅ owns | ❌ | ❌ |

@@ -2,8 +2,8 @@
 
 > **GitHub Issue:** [#75](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/75)  
 > **Wave:** 2 (Test-First Maintenance Delivery & Release `v2.0.1-lab7`)  
-> **Depends on:** `#74` (`LAB7-ISSUE-01`) reviewed & merged on `main` after `v2.0.0-sprint2`  
-> **Branch:** `feat/lab7-issue-02-max-qty-cap` → `main` *(isolated from `sprint-2-staging`)*  
+> **Depends on:** `#74` (`LAB7-ISSUE-01`) merged into `lab-7-staging` AND `main` (`v2.0.0-sprint2`) synced into `lab-7-staging` so pre-change code reflects the latest release  
+> **Branch:** `feat/lab7-issue-02-max-qty-cap` → `lab-7-staging` → Release PR `lab-7-staging` → `main` *(isolated from `sprint-2-staging`)*  
 > **Assignee:** `@meebotsompurin-stack` | **Reviewer:** `@poom2548`
 
 ---
@@ -29,7 +29,7 @@ Deliver the approved `CR-01` (`BR-03` / `FR-03-01`: `1 <= quantity <= 5` per bak
 - [ ] **AC-LAB7-02-05 (`CR01-UI-01`, `CR01-UI-02` — Frontend Cap & RTL):** `BakeryItemCard` caps `+` at `Math.min(item.stockQuantity, 5)` (and `OrderPage` clamps `handleQuantityChange` to `[0, Math.min(stockQuantity, 5)]`), displays `"Max 5 per item"`, and passes Vitest + React Testing Library (`jsdom`) tests.
 - [ ] **AC-LAB7-02-06 (`E2E-CR01-01` & `ORD-08` Intended Update):** Playwright `E2E-CR01-01` verifies UI cap at 5 and `"Max 5 per item"` notice across viewports; `ORD-08` in `server/src/__tests__/sprint-1/orders.api.test.ts` (L429) is updated from `quantity: 20` to a valid `quantity <= 5` exceeding lower stock so `409 CONFLICT` stock enforcement remains tested without weakening assertions.
 - [ ] **AC-LAB7-02-07 (Regression & CI):** All backend tests (`npm test`), client RTL tests (`npm test --workspace=client`), frontend build (`npm run build --workspace=client`), Playwright E2E, and GitHub Actions `test-and-docker` pass with zero skipped or weakened tests; no Prisma schema/migration changes are introduced.
-- [ ] **AC-LAB7-02-08 (Peer Review, Release Tag & Cloud Run Verification):** PR receives substantive review from `@poom2548`, merges into `main` (after `v2.0.0-sprint2`), is tagged **`v2.0.1-lab7`**, auto-deploys via Lab 5 CD pipeline to GCP Cloud Run (`https://crustcraft-d7wyiqxska-as.a.run.app`), and passes post-deployment verification for both changed behavior (`qty 5` → `201`, `qty 6` → `400`) and preserved Sprint 1 domain/access paths (`403` cross-customer isolation / `OPERATOR` denial).
+- [ ] **AC-LAB7-02-08 (Peer Review, Release Tag & Cloud Run Verification):** Feature PR receives substantive review from `@poom2548` and merges into `lab-7-staging`; reviewed Release PR `lab-7-staging` → `main` passes CI (`test-and-docker`) and is tagged **`v2.0.1-lab7`** (after `v2.0.0-sprint2`), auto-deploys via Lab 5 CD pipeline to GCP Cloud Run (`https://crustcraft-d7wyiqxska-as.a.run.app`), and passes post-deployment verification for both changed behavior (`qty 5` → `201`, `qty 6` → `400`) and preserved Sprint 1 domain/access paths (`403` cross-customer isolation / `OPERATOR` denial).
 
 ## Files Allowed
 - `server/src/services/orders.service.ts`

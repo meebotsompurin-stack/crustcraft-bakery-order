@@ -1,9 +1,9 @@
 # LAB7-ISSUE-01 — Change Impact Analysis & Pre-Implementation Contract Revision (Part A)
 
 > **GitHub Issue:** [#74](https://github.com/meebotsompurin-stack/crustcraft-bakery-order/issues/74)  
-> **Wave:** 1 (Spec-Driven Maintenance Gate — MUST be reviewed & merged before Wave 2 code)  
-> **Depends on:** `#73` (`LAB7-ISSUE-00`) & TA screenshots attached to `#73`; rebased onto `v2.0.0-sprint2` before merging to `main`  
-> **Branch:** `docs/lab7-issue-01-impact-and-contract` → `main` *(isolated from `sprint-2-staging`)*  
+> **Wave:** 1 (Spec-Driven Maintenance Gate — MUST be reviewed & merged into `lab-7-staging` before Wave 2 code)  
+> **Depends on:** `#73` (`LAB7-ISSUE-00`) merged into `lab-7-staging` & TA screenshots attached to `#73`  
+> **Branch:** `docs/lab7-issue-01-impact-and-contract` → `lab-7-staging` *(isolated from `sprint-2-staging`)*  
 > **Assignee:** `@poom2548` | **Reviewer:** `@meebotsompurin-stack`
 
 ---
