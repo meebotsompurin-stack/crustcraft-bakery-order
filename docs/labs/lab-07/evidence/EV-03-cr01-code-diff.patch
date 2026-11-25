@@ -1,0 +1,127 @@
+﻿diff --git a/client/src/components/BakeryItemCard.tsx b/client/src/components/BakeryItemCard.tsx
+index c9be430..1c0861a 100644
+--- a/client/src/components/BakeryItemCard.tsx
++++ b/client/src/components/BakeryItemCard.tsx
+@@ -1,6 +1,8 @@
+ import React from 'react';
+ import { type BakeryItemDto } from '../services/api';
+ 
++export const MAX_QUANTITY_PER_ITEM = 5;
++
+ export interface BakeryItemCardProps {
+   item: BakeryItemDto;
+   onSelect?: (item: BakeryItemDto) => void;
+@@ -15,6 +17,7 @@ export const BakeryItemCard: React.FC<BakeryItemCardProps> = ({
+   onQuantityChange,
+ }) => {
+   const isOutOfStock = item.stockQuantity <= 0;
++  const maxOrderQuantity = Math.min(item.stockQuantity, MAX_QUANTITY_PER_ITEM);
+   const formattedPrice = `฿${(item.price / 100).toFixed(2)}`;
+ 
+   return (
+@@ -40,12 +43,20 @@ export const BakeryItemCard: React.FC<BakeryItemCardProps> = ({
+               Out of Stock / สินค้าหมดชั่วคราว
+             </span>
+           ) : (
+-            <span
+-              data-testid="badge-in-stock"
+-              className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
+-            >
+-              In Stock: {item.stockQuantity}
+-            </span>
++            <div className="flex flex-col items-end gap-1">
++              <span
++                data-testid="badge-in-stock"
++                className="inline-block px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
++              >
++                In Stock: {item.stockQuantity}
++              </span>
++              <span
++                data-testid="badge-max-per-item"
++                className="inline-block px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200/70"
++              >
++                Max 5 per item
++              </span>
++            </div>
+           )}
+         </div>
+ 
+@@ -82,8 +93,10 @@ export const BakeryItemCard: React.FC<BakeryItemCardProps> = ({
+             </span>
+             <button
+               type="button"
+-              disabled={isOutOfStock || selectedQuantity >= item.stockQuantity}
+-              onClick={() => onQuantityChange(selectedQuantity + 1)}
++              disabled={isOutOfStock || selectedQuantity >= maxOrderQuantity}
++              onClick={() =>
++                onQuantityChange(Math.min(maxOrderQuantity, selectedQuantity + 1))
++              }
+               className="w-8 h-8 rounded-lg border border-stone-300 bg-white hover:bg-stone-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-bold text-stone-700"
+             >
+               +
+diff --git a/client/src/pages/OrderPage.tsx b/client/src/pages/OrderPage.tsx
+index 71c8c58..1639d7b 100644
+--- a/client/src/pages/OrderPage.tsx
++++ b/client/src/pages/OrderPage.tsx
+@@ -5,7 +5,10 @@ import {
+   createCustomerOrderApi,
+   type BakeryItemDto,
+ } from '../services/api';
+-import { BakeryItemCard } from '../components/BakeryItemCard';
++import {
++  BakeryItemCard,
++  MAX_QUANTITY_PER_ITEM,
++} from '../components/BakeryItemCard';
+ import { OrderSummary } from '../components/OrderSummary';
+ 
+ export const OrderPage: React.FC = () => {
+@@ -62,9 +65,14 @@ export const OrderPage: React.FC = () => {
+   }, [preselectId]);
+ 
+   const handleQuantityChange = (itemId: string, newQty: number) => {
++    const targetItem = items.find((i) => i.id === itemId);
++    const maxQty = targetItem
++      ? Math.min(targetItem.stockQuantity, MAX_QUANTITY_PER_ITEM)
++      : MAX_QUANTITY_PER_ITEM;
++    const clampedQty = Math.max(0, Math.min(newQty, maxQty));
+     setQuantities((prev) => ({
+       ...prev,
+-      [itemId]: newQty,
++      [itemId]: clampedQty,
+     }));
+   };
+ 
+diff --git a/server/src/services/orders.service.ts b/server/src/services/orders.service.ts
+index df81735..075d92e 100644
+--- a/server/src/services/orders.service.ts
++++ b/server/src/services/orders.service.ts
+@@ -1,6 +1,8 @@
+ import { prisma } from '../lib/db';
+ import { AppError } from './auth.service';
+ 
++export const MAX_QUANTITY_PER_ITEM = 5;
++
+ export interface CalculationItemInput {
+   bakeryItemId: string;
+   quantity: number;
+@@ -180,6 +182,20 @@ export async function createCustomerOrder(
+         [{ field: `items[${index}].quantity`, issue: 'Must be an integer greater than 0' }]
+       );
+     }
++
++    if (item.quantity > MAX_QUANTITY_PER_ITEM) {
++      throw new AppError(
++        400,
++        'VALIDATION_ERROR',
++        'Maximum order quantity is 5 units per item per order.',
++        [
++          {
++            field: `items[${index}].quantity`,
++            issue: 'Quantity cannot exceed 5 per item per order',
++          },
++        ]
++      );
++    }
+   }
+ 
+   // Normalized items with trimmed IDs

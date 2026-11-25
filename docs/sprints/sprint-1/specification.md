@@ -3,10 +3,17 @@
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
 > **Deliverable Section:** Deliverable 1 — Part E (Feature-Level Software Design Specification)  
-> **Sprint 1 Status:** 🟡 In Progress (Engineering Contracts Baseline — Pre-Implementation)  
+> **Sprint 1 Status:** 🟢 Accepted Baseline (`v1.0.0-sprint1`) → Revised `v1.1.0` for Lab 7 `CR-01` (Pre-Implementation Contract Gate)  
+> **Document Version:** `1.1.0`  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
+
+### Revision History
+| Version | Date | Issue / PR | Summary of Changes |
+|---|---|---|---|
+| `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial Sprint 1 Feature Engineering Specification (`F-01`–`F-04`). |
+| `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Revised `FR-03-01`, `BR-03`, §7.2 `OrderItem.quantity`, and §9.3 (`AC-CR01-01`..`AC-CR01-06`) for per-item cap (`1 <= quantity <= 5`), duplicate `bakeryItemId` `400` rejection, `400`-before-`409` precedence, and `ORD-08` intended update. |
 
 ---
 
@@ -62,7 +69,7 @@ Artisan bakeries operate under strict daily batch limits due to multi-hour dough
 * **FR-02-04 (Frontend Catalog Card Presentation):** The React client renders a `BakeryItemCard` for each item displaying its name, category, description, price formatted in Thai Baht (`฿(price / 100).toFixed(2)`), remaining stock count, and availability badge (displaying `"Out of Stock"` / `"สินค้าหมดชั่วคราว"` and disabling order selection when `stockQuantity == 0`).
 
 ### 4.3 F-03: Customer Pre-Order Creation & Authoritative Server Calculation
-* **FR-03-01 (Pre-Order Submission):** An authenticated `CUSTOMER` can create a pre-order via `POST /api/customer/orders` containing `items: Array<{ bakeryItemId: string, quantity: number }>` (non-empty array) and an optional `pickupNote?: string`.
+* **FR-03-01 (Pre-Order Submission — Revised v1.1.0 / `CR-01`):** An authenticated `CUSTOMER` can create a pre-order via `POST /api/customer/orders` containing `items: Array<{ bakeryItemId: string, quantity: number }>` (non-empty array with **unique `bakeryItemId` entries** and integer **`1 <= quantity <= 5`**, `MAX_QUANTITY_PER_ITEM = 5`) and an optional `pickupNote?: string` (maximum 500 characters per Lab 6 `#58`). Duplicate `bakeryItemId` entries or `quantity > 5` are rejected with `400 VALIDATION_ERROR` before transaction execution (taking precedence over `409 CONFLICT`), with indexed `details[].field` references (`items[<index>].bakeryItemId` / `items[<index>].quantity`).
 * **FR-03-02 (Server-Side Satang Total Calculation):** The server calculates `Order.totalAmount` (`Int` satang) exclusively as the sum of `(BakeryItem.price * item.quantity)` fetched from the database, ignoring any client-supplied price or total fields (`BR-01`).
 * **FR-03-03 (OrderItem Unit Price Snapshot):** Each created `OrderItem` stores `unitPriceAtOrder` (`Int` satang) copied from `BakeryItem.price` at the exact moment of order creation (`BR-02`).
 * **FR-03-04 (Atomic Stock Validation & Deduction):** Within a single `prisma.$transaction`, the server verifies `isAvailable == true` and `stockQuantity >= quantity` for every requested item, decrements `BakeryItem.stockQuantity` by `quantity`, and persists the `Order` and `OrderItem` records (`BR-03`, `BR-05`).
@@ -81,7 +88,7 @@ Artisan bakeries operate under strict daily batch limits due to multi-hour dough
 
 * **BR-01 (Authoritative Server-Side Pricing in Satang):** Order `totalAmount` MUST be calculated exclusively on the server using authoritative `BakeryItem.price` values from the database in **integer satang (`Int`, `100 satang = 1.00 THB`)**. Client-supplied prices or totals are strictly ignored.
 * **BR-02 (Price Snapshot in Satang):** Each `OrderItem` MUST capture `unitPriceAtOrder` (`Int` in satang) from `BakeryItem.price` at the moment of order creation so historical order records remain immutable if catalog prices change later.
-* **BR-03 (Stock Atomicity):** Valid orders MUST validate and atomically deduct `stockQuantity` for all line items within a single database transaction (`prisma.$transaction`). If any item fails validation, the entire transaction rolls back with zero partial stock deductions.
+* **BR-03 (Per-Item Quantity Cap, Duplicate-Item Guard & Stock Atomicity — Revised v1.1.0 / `CR-01`):** Pre-order submissions MUST first pass pre-transaction domain validation requiring unique `bakeryItemId` entries (rejecting duplicates with `400 VALIDATION_ERROR`) and integer **`1 <= quantity <= 5`** (`MAX_QUANTITY_PER_ITEM = 5`, rejecting `<= 0` or `> 5` with `400 VALIDATION_ERROR` **before** any `409 CONFLICT` stock check). Once pre-transaction validation passes, valid orders MUST validate availability/stock and atomically deduct `stockQuantity` for all line items within a single database transaction (`prisma.$transaction`). If any item fails validation, the entire transaction rolls back with zero partial stock deductions. Existing historical `OrderItem` records remain immutable.
 * **BR-04 (Customer Ownership Isolation):** A `CUSTOMER` MUST only access their own orders (`order.customerId === req.user.userId`). Cross-customer access attempts on `GET /api/customer/orders/:id` MUST return `403 FORBIDDEN`.
 * **BR-05 (`isAvailable` vs. `stockQuantity` Separation):** `isAvailable` (`Boolean`) is a manual catalog visibility flag controlled by `OPERATOR` (`GET /api/catalog` returns items with `isAvailable == true`). When `stockQuantity` reaches `0`, `isAvailable` does **NOT** automatically become `false`; the item remains visible in the catalog as `"Out of Stock"` (`stockQuantity: 0`), and any order request with `stockQuantity == 0` or `quantity > stockQuantity` is rejected with `409 CONFLICT`. Ordering an item with `isAvailable == false` is also rejected with `409 CONFLICT`.
 * **BR-06 (Shared Global Operator Queue):** All `OPERATOR` accounts have shared visibility and status-transition authority over all incoming orders in the system (single-bakery operational model, documented as ADR-05 in `docs/system-sds.md` and Section 3 of `docs/srs.md`).
@@ -204,7 +211,7 @@ model OrderItem {
 | `OrderItem` | `id` | `String` | Primary key (`@default(cuid())`). |
 | `OrderItem` | `orderId` | `String` | Foreign key referencing `Order.id` (`onDelete: Cascade`). |
 | `OrderItem` | `bakeryItemId` | `String` | Foreign key referencing `BakeryItem.id`. |
-| `OrderItem` | `quantity` | `Int` | Positive integer (`> 0`) representing units ordered. |
+| `OrderItem` | `quantity` | `Int` | Integer units ordered: **`1 <= quantity <= 5`** (`MAX_QUANTITY_PER_ITEM = 5`) for all new orders (`CR-01`); historical rows preserved untouched (no DB schema migration). |
 | `OrderItem` | `unitPriceAtOrder` | **`Int`** | **Monetary (`Int` satang):** Immutable snapshot of `BakeryItem.price` at order creation time (`BR-02`). |
 
 ### 7.3 Idempotent Seed Data (`prisma/seed.ts`)
@@ -265,9 +272,17 @@ To maintain seamless bi-directional traceability across `docs/traceability.md`, 
 * **AC-03-02 (`AC-04-09`):** Given a newly created order, each `OrderItem.unitPriceAtOrder` (`Int` satang) equals the database `BakeryItem.price` at the moment of order creation (`ORD-03`).
 * **AC-03-03 (`AC-04-10`, `AC-04-11`):** Given a valid order submission, `BakeryItem.stockQuantity` is atomically decremented inside `prisma.$transaction` (`ORD-04`); if any line item in a multi-item order fails stock validation, the entire transaction rolls back and no item's stock is modified (`ORD-05`). When `stockQuantity` reaches `0`, `isAvailable` remains `true` (`BR-05`).
 * **AC-03-04 (`AC-04-13`):** Given an order containing a `BakeryItem` with `isAvailable == false`, when `POST /api/customer/orders` is called, then the server rejects the order with `409 CONFLICT` (`ORD-07`).
-* **AC-03-05 (`AC-04-14`):** Given an order requesting `quantity > stockQuantity` or targeting an item with `stockQuantity == 0`, when `POST /api/customer/orders` is called, then the server rejects the order with `409 CONFLICT` (`ORD-08`).
+* **AC-03-05 (`AC-04-14`):** Given an order requesting a valid per-item quantity (`1 <= quantity <= 5`) where `quantity > stockQuantity`, or targeting an item with `stockQuantity == 0`, when `POST /api/customer/orders` is called, then the server rejects the order with `409 CONFLICT` (`ORD-08` — intended update in Lab 7 `CR-01`, `CR01-04`).
 * **AC-03-06 (`AC-04-15`, `AC-04-16`, `AC-04-17`, `AC-04-19`, `AC-04-20`):** Given an authenticated `CUSTOMER`, `GET /api/customer/orders` returns only their own orders (`ORD-09`, `E2E-04`) and `GET /api/customer/orders/:id` returns `200 OK` for their own order (`ORD-10`, `E2E-05`), whereas requesting another customer's order ID returns `403 FORBIDDEN` (`ORD-11`).
 * **AC-03-07 (`AC-04-12`):** Given an order request with `quantity <= 0` or an empty `items` array, when `POST /api/customer/orders` is called, then the server rejects the request with `400 VALIDATION_ERROR` (`ORD-06`).
+
+#### Lab 7 `CR-01` Acceptance Criteria (`BR-03` / `FR-03-01` — Max 5 Per-Item Cap)
+* **AC-CR01-01 (Boundary 5 Allowed / 6 Rejected):** Given an authenticated `CUSTOMER` and an in-stock item (`stockQuantity: 20`), submitting `quantity: 5` returns `201 Created` and decrements stock by 5 (`CR01-01`), whereas submitting `quantity: 6` returns `400 VALIDATION_ERROR` with `message: "Maximum order quantity is 5 units per item per order."` and `details: [{ field: "items[0].quantity", issue: "Quantity cannot exceed 5 per item per order" }]`, persisting no order and leaving stock unchanged (`CR01-02`).
+* **AC-CR01-02 (Multi-Item Indexed Field & Zero Deduction):** Given a multi-item order where `items[0].quantity === 2` and `items[1].quantity === 6`, `POST /api/customer/orders` returns `400 VALIDATION_ERROR` with exact `details[0].field === "items[1].quantity"`, and deducts zero stock from either item (`CR01-03`).
+* **AC-CR01-03 (`400` Before `409` Precedence & Preserved Stock Guard):** Given an item with `stockQuantity: 3`, submitting `quantity: 5` returns `409 CONFLICT` (`CR01-04`, `ORD-08`), whereas submitting `quantity: 6` (violating both `> 5` and `> stockQuantity`) returns `400 VALIDATION_ERROR` **before** `409 CONFLICT` with `details[0].field === "items[0].quantity"` (`CR01-06`).
+* **AC-CR01-04 (Duplicate `bakeryItemId` Anti-Bypass Guard):** Given an order containing duplicate `bakeryItemId` entries (e.g., `items[0]: { bakeryItemId: A, quantity: 5 }`, `items[1]: { bakeryItemId: A, quantity: 5 }`), `POST /api/customer/orders` rejects the request with `400 VALIDATION_ERROR` (`details[0].field === "items[1].bakeryItemId"`) before transaction execution and deducts zero stock (`CR01-05`).
+* **AC-CR01-05 (Frontend UI Cap & Notice):** `BakeryItemCard` disables `+` at `Math.min(item.stockQuantity, 5)` and displays `"Max 5 per item"`, and `OrderPage.handleQuantityChange` clamps quantities to `[0, Math.min(item.stockQuantity, 5)]` (`CR01-UI-01`, `CR01-UI-02`).
+* **AC-CR01-06 (E2E Multi-Viewport Cap Verification):** Across Desktop/Tablet/Mobile viewports, a customer on `/orders/new` sees `"Max 5 per item"`, cannot increment past 5 via `+`, and can successfully submit a `quantity: 5` pre-order (`E2E-CR01-01`).
 
 ### 9.4 F-04: Operator Incoming Order Queue & Acceptance (`ISSUE-05`)
 * **AC-04-01 (`AC-05-01`, `AC-05-07`):** Given an authenticated `CUSTOMER`, when they call `GET /api/operator/orders` or `PATCH /api/operator/orders/:id/status`, then the server rejects the request with `403 FORBIDDEN` (`OPS-01`, `OPS-07`).
