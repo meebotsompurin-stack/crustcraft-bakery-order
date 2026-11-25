@@ -12,6 +12,7 @@ import {
   createOperatorCatalogItemHandler,
   updateOperatorCatalogItemHandler,
 } from '../controllers/catalogAdmin.controller';
+import { getOperatorSalesSummaryHandler } from '../controllers/reporting.controller';
 
 export const operatorRouter = Router();
 
@@ -25,3 +26,5 @@ operatorRouter.patch('/orders/:id/payment', updateOperatorPaymentHandler);
 operatorRouter.get('/catalog', getOperatorCatalogHandler);
 operatorRouter.post('/catalog', createOperatorCatalogItemHandler);
 operatorRouter.patch('/catalog/:id', updateOperatorCatalogItemHandler);
+
+operatorRouter.get('/reports/summary', getOperatorSalesSummaryHandler);
