@@ -11,8 +11,8 @@
 > - Accepted Sprint 1 Baseline: `v1.0.0-sprint1` (`ebcf83b` → `7a1d9db`, PR `#15`)
 > - Lab 5/6 Deployed Baseline: `c876686` (PR `#60`, GCP Cloud Run + Cloud SQL PostgreSQL 16 + Lab 6 `#58` fix)
 > - Standalone Sprint 2 Release (Part B): `v2.0.0-sprint2` (`c63f876`, PR `#72`)
-> - Lab 7 Maintenance Release (`CR-01`): `v2.0.1-lab7` (`b80a0d0`, PR `#82`, Cloud Run `crustcraft-00012-4dq`; Lab 7 report merged at `b371ba8`, PR `#84`)
-> - **Target Deliverable 2 Integrated Release Candidate (Part E):** `v2.1.0-s3-progress` (Sprint 1 + Lab 5–7 + Sprint 2 `F-05`–`F-07` + Sprint 3 `F-08`)
+> - Lab 7 Maintenance Release (`CR-01`): `v2.0.1-lab7` (`b80a0d0`, PR `#82`, Cloud Run `crustcraft-00012-4dq`, live URL `https://crustcraft-d7wyiqxska-as.a.run.app`; Lab 7 report merged at `b371ba8`, PR `#84`)
+> - **Target Deliverable 2 Integrated Release Candidate (Part E):** `v2.1.0-s3-progress` (Sprint 1 + Lab 5–7 + Sprint 2 `F-05`–`F-07` + Sprint 3 `F-08`, deploying to `https://crustcraft-d7wyiqxska-as.a.run.app`)
 
 ---
 
@@ -74,5 +74,6 @@ The accepted Sprint 1 baseline (`v1.0.0-sprint1`, commit `7a1d9db`) established 
 | **UI Polish** | **READY** | Temporary `"Release B"` banner removed from `client/src/App.tsx`; responsive layouts verified at `1280px`, `768px`, and `375px` (`NFR-04`). |
 | **Database Migrations** | **READY** | Forward-only PostgreSQL migrations (`20261113020711_init_postgres`, `20261123153646_add_order_payment_status`) apply cleanly via `prisma migrate deploy` with zero data loss. |
 | **Open Defects** | **READY** | `0` open Critical, `0` open Major, `0` open Minor defects (Lab 6 `#58` resolved and regression-guarded). |
-| **Documentation & Setup** | **READY** | `docs/features.md`, `docs/traceability.md` (`v2.1.0`), `docs/sprints/sprint-2/tests.md`, `docs/sprints/sprint-3/tests.md`, and `README.md` updated to match the PostgreSQL + Sprint 2/3 + Lab 7 release. |
-| **Release Candidate Verdict** | **`READY FOR RELEASE PR`** | Ready to merge `sprint-2-staging` → `main`, auto-deploy to GCP Cloud Run, tag **`v2.1.0-s3-progress`**, and execute post-deploy smoke & persistence verification. |
+| **Documentation & Setup** | **READY** | `docs/features.md`, `docs/traceability.md` (`v2.1.0`), `docs/sprints/plan.md` (`v2.1.0`), `docs/sprints/sprint-2/tests.md`, `docs/sprints/sprint-3/tests.md`, and `README.md` updated to match the PostgreSQL + Sprint 2/3 + Lab 7 release. |
+| **Live Deployment Target** | **READY** | GCP Cloud Run service `crustcraft` (`asia-southeast1`) at `https://crustcraft-d7wyiqxska-as.a.run.app` (currently running `v2.0.1-lab7` / `crustcraft-00012-4dq`; auto-deploys `v2.1.0-s3-progress` upon Release PR merge to `main`). |
+| **Release Candidate Verdict** | **`READY FOR RELEASE PR`** | Ready to merge `sprint-2-staging` → `main`, auto-deploy to `https://crustcraft-d7wyiqxska-as.a.run.app`, tag **`v2.1.0-s3-progress`**, and execute post-deploy smoke & persistence verification. |

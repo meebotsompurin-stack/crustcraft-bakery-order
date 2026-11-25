@@ -106,13 +106,13 @@ Open your browser at `http://localhost:5173`.
   ```
 
 ### 6. Default Test Credentials
-The database seed creates the following default accounts for local development and testing:
+The database seed (`prisma/seed.ts`) creates the following accounts for local development and testing using environment variables (never commit real passwords or production secrets to Git):
 
 | Role | Email | Password | Allowed Access |
 |---|---|---|---|
-| **Operator** | `operator@crustcraft.com` | `operator123` | Order Queue (`/operator/orders`), Catalog Admin (`/operator/catalog`), Sales Reports (`/operator/reports`) |
-| **Customer 1** | `customer1@test.com` | `customer123` | Bakery Catalog (`/catalog`), Pre-Order Form (`/orders/new`), My Orders (`/orders`) |
-| **Customer 2** | `customer2@test.com` | `customer123` | Customer features (isolated order history) |
+| **Operator** | `admin@crustcraft.com` | Set via `ADMIN_PASSWORD` in `.env` | Order Queue (`/operator/orders`), Catalog Admin (`/operator/catalog`), Sales Reports (`/operator/reports`) |
+| **Customer 1** | `customer1@test.com` | Set via `DEMO_USER_PASSWORD` in `.env` | Bakery Catalog (`/catalog`), Pre-Order Form (`/orders/new`), My Orders (`/orders`) |
+| **Customer 2** | `customer2@test.com` | Set via `DEMO_USER_PASSWORD` in `.env` | Customer features (isolated order history) |
 
 ## License
 

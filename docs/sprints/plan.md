@@ -2,7 +2,7 @@
 
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
-> **Document Version:** `1.0.0` (Sprint 1 Engineering Baseline)  
+> **Document Version:** `2.1.0` (Deliverable 2 Integrated Candidate — `v2.1.0-s3-progress`)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
@@ -13,15 +13,15 @@
 
 CrustCraft development progresses across three core engineering sprints aligned with the three major project deliverables and three group laboratory assessments.
 
-| Cycle | Assessment / Deliverable | Due Date | Academic Weight | Allocated Features | Core Delivery Outcome |
-|:---:|---|:---:|:---:|---|---|
-| **Phase 0** | Repo Init & Governance Baseline | 31 Oct 2026 | — | Setup & Governance | Repository structure, plan documents, AI coding SOPs, and `ISSUE-00` |
-| **Sprint 1** | **Project Deliverable 1** | **8 Nov 2026** | **80 pts (8%)** | **`F-01`, `F-02`, `F-03`, `F-04`** | **Engineering Baseline & Working Vertical Slice:** Spec DD contracts predating code, full auth, catalog, atomic customer pre-orders, and operator acceptance |
-| Group Lab 5 | Lab 5: Containerization & Cloud CI/CD | 15 Nov 2026 | 100 pts (5%) | `F-01` to `F-04` (Deployed) | Docker containerization, automated GitHub Actions CI quality gates, and GCP deployment with persistent storage |
-| Group Lab 6 | Lab 6: Cross-Team UAT & Defect Management | 22 Nov 2026 | 100 pts (5%) | `F-01` to `F-04` (Tested) | Formal cross-team user acceptance testing, defect reporting, triage, and regression-safe defect resolution |
-| **Sprint 2** | **Project Deliverable 2** | **29 Nov 2026** | **70 pts (7%)** | **`F-05`, `F-06`, `F-07`** | **Core Expansion Increment:** Bakery catalog admin, complete fulfillment lifecycle, cancellation with stock restoration, and simulated payments |
-| Group Lab 7 | Lab 7: Maintenance, Metrics & Release Readiness | 29 Nov 2026 | 100 pts (5%) | `F-09` (Maintenance) | Formal change impact analysis, test-first maintenance change implementation, and objective engineering metrics |
-| **Sprint 3** | **Final Project Delivery** | **13 Dec 2026** | **100 pts (10%)** | **`F-08`, `F-09`** | **Complete Verified Release:** Sales analytics reporting, order filtering/search, final release packaging, report PDF, and demonstration video |
+| Cycle | Assessment / Deliverable | Due Date | Academic Weight | Allocated Features | Core Delivery Outcome | Status / Release |
+|:---:|---|:---:|:---:|---|---|---|
+| **Phase 0** | Repo Init & Governance Baseline | 31 Oct 2026 | — | Setup & Governance | Repository structure, plan documents, AI coding SOPs, and `ISSUE-00` | ✅ Completed |
+| **Sprint 1** | **Project Deliverable 1** | **8 Nov 2026** | **80 pts (8%)** | **`F-01`, `F-02`, `F-03`, `F-04`** | **Engineering Baseline & Working Vertical Slice:** Spec DD contracts predating code, full auth, catalog, atomic customer pre-orders, and operator acceptance | ✅ Released (`v1.0.0-sprint1`) |
+| Group Lab 5 | Lab 5: Containerization & Cloud CI/CD | 15 Nov 2026 | 100 pts (5%) | `F-01` to `F-04` (Deployed) | Docker containerization, automated GitHub Actions WIF CI/CD quality gates, and GCP Cloud Run + Cloud SQL PostgreSQL 16 deployment | ✅ Deployed (`c876686`) |
+| Group Lab 6 | Lab 6: Cross-Team UAT & Defect Management | 22 Nov 2026 | 100 pts (5%) | `F-01` to `F-04` (Tested) | Formal cross-team user acceptance testing, defect reporting (`#58` `pickupNote <= 500`), triage, and regression-safe fix verification | ✅ Verified (`c876686`) |
+| **Sprint 2** | **Project Deliverable 2** | **29 Nov 2026** | **70 pts (7%)** | **`F-05`, `F-06`, `F-07` (+ `F-08` progress)** | **Core Expansion Increment & Sprint 3 Progress:** Bakery catalog admin (`F-05`), fulfillment & cancellation (`F-06`), simulated payment (`F-07`), and sales reporting (`F-08`) | ✅ Released (`v2.0.0-sprint2` / `v2.1.0-s3-progress`) |
+| Group Lab 7 | Lab 7: Maintenance, Metrics & Release Readiness | 29 Nov 2026 | 100 pts (5%) | **`CR-01` (`BR-03` / `FR-03-01` Max 5 cap on `F-03`)** | Formal change impact analysis, TDD RED→GREEN maintenance implementation (`1 <= quantity <= 5`), 5 objective metrics, release readiness & Lab 7 PDF | ✅ Released (`v2.0.1-lab7`, PR `#84`) |
+| **Sprint 3** | **Final Project Delivery** | **13 Dec 2026** | **100 pts (10%)** | **`F-08` (Done), `F-09` (Planned)** | **Complete Verified Release:** Sales analytics reporting (`F-08` verified at `v2.1.0-s3-progress`), order filtering/search (`F-09` planned), CI hardening, final report PDF, and 10-min demo video | 🟡 In Progress (`F-08` ✅, `F-09` ⬜ Planned for `v3.0.0`) |
 
 ---
 
