@@ -3,10 +3,17 @@
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
 > **Deliverable Section:** Deliverable 1 — Part E (UI/UX & Responsive Specification)  
-> **Sprint 1 Status:** 🟡 In Progress (Engineering Contracts Baseline — Pre-Implementation)  
+> **Sprint 1 Status:** 🟢 Accepted Baseline (`v1.0.0-sprint1`) → Revised `v1.1.0` for Lab 7 `CR-01` (Pre-Implementation Contract Gate)  
+> **Document Version:** `1.1.0`  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
+
+### Revision History
+| Version | Date | Issue / PR | Summary of Changes |
+|---|---|---|---|
+| `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial Sprint 1 UI/UX & Responsive Specification across Desktop (`1280px`), Tablet (`768px`), and Mobile (`375px`). |
+| `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Updated `BakeryItemCard` (§3.1) and `OrderPage` / `OrderForm` (§2, §3.2) to enforce `Math.min(stockQuantity, 5)` per-item quantity cap, clamp `handleQuantityChange` to `[0, Math.min(stockQuantity, 5)]`, and display `"Max 5 per item"` notice (`CR01-UI-01..02`, `E2E-CR01-01`). |
 
 ---
 
@@ -40,7 +47,7 @@
 | **`LoginPage`** | `client/src/pages/LoginPage.tsx` | `/login` | Public (Redirects authenticated users to default portal) | Email + password login form, validation feedback, link to `/register`, sets `AuthContext` session via `httpOnly` cookie. |
 | **`RegisterPage`** | `client/src/pages/RegisterPage.tsx` | `/register` | Public | Customer registration form (`name`, `email`, `password`), duplicate email error banner (`409`), redirects to `/login` or `/catalog` upon success. |
 | **`CatalogPage`** | `client/src/pages/CatalogPage.tsx` | `/catalog` (and `/` redirect) | Authenticated (`CUSTOMER` \| `OPERATOR` via `ProtectedRoute`) | Displays grid of active `BakeryItemCard` components (`isAvailable == true`), category badges, THB prices (`satang / 100`), stock counts, `"Out of Stock"` states, and navigation to place a pre-order. |
-| **`OrderPage`** | `client/src/pages/OrderPage.tsx` | `/orders/new` | `CUSTOMER` only (`ProtectedRoute` with `allowedRoles={['CUSTOMER']}`) | Hosts the interactive `OrderForm` + live `OrderSummary` preview: allows selecting available items (`stockQuantity > 0`), setting quantities (`1..stockQuantity`), adding an optional `pickupNote`, and submitting to `POST /api/customer/orders`. |
+| **`OrderPage`** | `client/src/pages/OrderPage.tsx` | `/orders/new` | `CUSTOMER` only (`ProtectedRoute` with `allowedRoles={['CUSTOMER']}`) | Hosts the interactive `OrderForm` + live `OrderSummary` preview: allows selecting available items (`stockQuantity > 0`), setting quantities (`1..Math.min(stockQuantity, 5)` per `CR-01` with `"Max 5 per item"` notice), adding an optional `pickupNote` (`<= 500` chars), and submitting to `POST /api/customer/orders`. |
 | **`MyOrdersPage`** | `client/src/pages/MyOrdersPage.tsx` | `/orders` | `CUSTOMER` only (`ProtectedRoute` with `allowedRoles={['CUSTOMER']}`) | Displays chronological list (newest first) of the customer's own pre-orders (`GET /api/customer/orders`) with order ID, status badge (`PENDING` / `ACCEPTED`), formatted THB total, item count, and link to `/orders/:id`. |
 | **`OrderDetailPage`** | `client/src/pages/OrderDetailPage.tsx` | `/orders/:id` | `CUSTOMER` only (`ProtectedRoute` with `allowedRoles={['CUSTOMER']}`) | Renders `OrderSummary` for a single customer order (`GET /api/customer/orders/:id`): status badge, timestamps, `pickupNote`, line item table (`quantity`, `unitPriceAtOrder` in THB, line subtotal in THB), and authoritative `totalAmount` in THB. |
 | **`OperatorOrderQueuePage`** | `client/src/pages/OperatorOrderQueuePage.tsx` | `/operator/orders` | `OPERATOR` only (`ProtectedRoute` with `allowedRoles={['OPERATOR']}`) | Shared storewide incoming order queue (`GET /api/operator/orders`, sorted `PENDING` first). Renders `OperatorOrderRow` per order with customer name, status badge, THB total, `"Accept Order"` action button (`PATCH /api/operator/orders/:id/status`), and link to detail view. |
@@ -68,10 +75,11 @@
     actionLabel?: string;
   }
   ```
-- **Monetary & Stock Presentation Rules:**
+- **Monetary, Stock & Quantity Cap Presentation Rules (`BR-03` / `CR-01`, `BR-05`):**
   - Displays formatted price `฿${(item.price / 100).toFixed(2)}` (e.g., `8500` → `฿85.00`).
-  - **In-Stock State (`stockQuantity > 0`):** Shows green badge `"In Stock (${item.stockQuantity} left)"` (`bg-emerald-100 text-emerald-800`) and enables the `"Add to Pre-Order"` / `"Order Now"` button.
-  - **Out-of-Stock State (`isAvailable === true && stockQuantity === 0`):** Card remains visible (`opacity-90`), displays prominent red/amber badge `"Out of Stock / สินค้าหมดชั่วคราว"` (`bg-red-100 text-red-800`, `data-testid="out-of-stock-badge"`), and renders the action button as `disabled` (`cursor-not-allowed bg-stone-300 text-stone-500`) with label `"Out of Stock"`.
+  - **In-Stock State (`stockQuantity > 0`):** Shows green badge `"In Stock: ${item.stockQuantity}"` (`bg-emerald-50 text-emerald-800`) alongside a clear **`"Max 5 per item"`** rule notice (`CR01-UI-02`, `E2E-CR01-01`), and enables the `"Pre-Order"` button or quantity stepper.
+  - **Quantity Stepper Cap (`CR-01` / `AC-CR01-05`):** When rendered with `onQuantityChange` and `selectedQuantity`, computes `maxOrderQuantity = Math.min(item.stockQuantity, 5)` (`MAX_QUANTITY_PER_ITEM = 5`). The `+` button MUST be `disabled` whenever `isOutOfStock || selectedQuantity >= maxOrderQuantity` (e.g., disabled at `5` when `stockQuantity === 20`, and disabled at `3` when `stockQuantity === 3`, verified by `CR01-UI-01`).
+  - **Out-of-Stock State (`isAvailable === true && stockQuantity === 0`):** Card remains visible (`opacity-90`), displays prominent red/amber badge `"Out of Stock / สินค้าหมดชั่วคราว"` (`bg-rose-100 text-rose-800`, `data-testid="badge-out-of-stock"`), and renders the action button / `+` stepper as `disabled` (`cursor-not-allowed bg-stone-300 text-stone-500`) with label `"Sold Out"`.
 - **Loading State (Parent `CatalogPage`):** Renders a 3-card skeleton grid (`animate-pulse bg-stone-200 rounded-xl h-64`) while `GET /api/catalog` is in flight.
 - **Empty State (Parent `CatalogPage`):** Displays `"No bakery items are currently available on the menu."` centered card when `items.length === 0`.
 - **Error State (Parent `CatalogPage`):** Displays red alert box (`bg-red-50 border border-red-200 text-red-700`) with error message and a `"Retry"` button.
@@ -92,7 +100,7 @@
   - `submitError: string | null`
 - **Validation & Domain Guards:**
   - Items with `stockQuantity === 0` have their quantity controls disabled and cannot be added.
-  - Quantity stepper enforces `0 <= quantity <= item.stockQuantity`. Attempting to submit with zero total items selected disables the submit button.
+  - Quantity stepper and `OrderPage.handleQuantityChange(itemId, newQty)` strictly clamp quantities to **`0 <= quantity <= Math.min(item.stockQuantity, 5)`** (`MAX_QUANTITY_PER_ITEM = 5`, `CR-01` / `AC-CR01-05`). Attempting to submit with zero total items selected disables the submit button.
   - Client calculates a preview total `sum(item.price * quantity) / 100` for user convenience, clearly labeled *"Authoritative total calculated by server upon submission"*.
 - **Loading State:** Shows loading indicator while fetching catalog items; disables form inputs and displays `"Placing Pre-Order..."` on the submit button while `POST /api/customer/orders` is pending.
 - **Empty State:** If no catalog items have `stockQuantity > 0`, displays banner: `"All artisan batches are currently sold out for today."`

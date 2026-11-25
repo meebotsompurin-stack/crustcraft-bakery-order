@@ -1,0 +1,48 @@
+=== GitHub Actions Deploy demo — Run #45440212465 (2026-11-24T16:42:18Z / 23:42:18 +07) ===
+Workflow: Deploy demo (.github/workflows/deploy.yml -> reusable ci-docker.yml)
+Trigger: push to main (Merge PR #82: lab-7-staging -> main)
+Commit SHA: b80a0d0492b9fa4cf3b9cfcb24a7455c2dfb9242 (tag v2.0.1-lab7)
+URL: https://github.com/meebotsompurin-stack/crustcraft-bakery-order/actions/runs/45440212465
+
+--- Job 1: test / test-and-docker (Job ID 138608916731) — SUCCESS (1m16s) ---
+1) Deploy script & smoke unit checks:
+   PASS: test_deploy_stub.sh
+   PASS: test_release_stub.sh
+   python3 -m unittest discover -s deploy/tests -p 'test_smoke.py' -> Ran 5 tests in 0.648s (OK)
+
+2) Backend Vitest Suite (PostgreSQL 16 service container, `npm test`):
+   ✓ src/__tests__/sprint-1/orders.api.test.ts (18 tests) 1032ms
+   ✓ src/__tests__/sprint-2/admin.api.test.ts (8 tests) 1036ms
+   ✓ src/__tests__/sprint-2/fulfillment.api.test.ts (8 tests) 1109ms
+   ✓ src/__tests__/sprint-1/operator.api.test.ts (11 tests) 1047ms
+   ✓ src/__tests__/lab-7/order-quantity-cap.api.test.ts (6 tests) 970ms
+   ✓ src/__tests__/sprint-2/payment.api.test.ts (7 tests) 1035ms
+   ✓ src/__tests__/unit/orderCalculation.test.ts (8 tests) 10ms
+   ✓ src/__tests__/unit/auth.test.ts (5 tests) 181ms
+   ✓ src/__tests__/sprint-1/catalog.api.test.ts (6 tests) 871ms
+   ✓ src/__tests__/sprint-1/auth.api.test.ts (8 tests) 1128ms
+   Test Files  10 passed (10)
+        Tests  85 passed (85) (0 failed, 0 skipped)
+     Duration  4.66s
+
+3) Frontend Production Build (`cd client && npm ci && npm run build`):
+   ✓ 50 modules transformed.
+   ✓ built in 793ms
+
+4) Unified Production Dockerfile Build (`docker build -t crustcraft-app:latest .`):
+   ✓ 50 modules transformed.
+   ✓ built in 1.69s
+   Status: SUCCESS
+
+--- Job 2: deploy (Job ID 138609807015) — SUCCESS (2m24s) ---
+GCP Project: cpe334-bobcat | Region: asia-southeast1
+Deployed Image: asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft@sha256:95ba462a42758f8fd5062cfeb980274675125ccf6c51e31da1bc4a0eb4a62af0
+Cloud Run Service: crustcraft
+Revision: crustcraft-00012-4dq (serving 100% LATEST traffic)
+Service URL: https://crustcraft-d7wyiqxska-as.a.run.app
+Automated Public Smoke Checks (`deploy/smoke_test.py`):
+   PASS /api/health
+   PASS /api/ready
+   PASS /
+   PASS /api/catalog (auth guard active: 401)
+   SKIP login: optional smoke credentials not configured

@@ -1,0 +1,23 @@
+=== Live Cloud Run Post-Deploy Verification (2026-11-24T23:48:09+07:00) ===
+Target: https://crustcraft-d7wyiqxska-as.a.run.app
+Cloud Run Service: crustcraft (asia-southeast1)
+Cloud Run Revision: crustcraft-00012-4dq (100% traffic)
+Image Digest: asia-southeast1-docker.pkg.dev/cpe334-bobcat/crustcraft/crustcraft@sha256:95ba462a42758f8fd5062cfeb980274675125ccf6c51e31da1bc4a0eb4a62af0
+Release Tag: v2.0.1-lab7 (annotated tag 933488a -> commit b80a0d0)
+Note: Executed with ephemeral test customer accounts; zero production credentials or tokens logged.
+
+[1] GET /api/health -> 200 {"status": "ok"}
+[2] GET /api/ready -> 200 {"status": "ready", "db": "connected"}
+[3] Unauth GET /api/customer/orders -> 401 {"error": {"code": "UNAUTHORIZED", "message": "Authentication credentials are required"}}
+[4] Register & Login Customer A (ephemeral) -> 201 / 200 (userId=cmwuxizcl0001pzwii7e48gva, role=CUSTOMER)
+[5] Register & Login Customer B (ephemeral) -> 201 / 200 (userId=cmwuxizms0002pzwibi14yegp, role=CUSTOMER)
+[6] GET /api/catalog -> 200 (count=5; selected=Artisan Butter Croissant, stockBefore=50)
+[7] CR-01 qty=6 POST /api/customer/orders -> 400 {"error": {"code": "VALIDATION_ERROR", "message": "Maximum order quantity is 5 units per item per order.", "details": [{"field": "items[0].quantity", "issue": "Quantity cannot exceed 5 per item per order"}]}}
+[8] CR-01 duplicate bakeryItemId (5+5) -> 400 {"error": {"code": "VALIDATION_ERROR", "message": "Duplicate bakeryItemId 'cmweuf2o60003dh1cate38n8c' entries are not allowed in a single order.", "details": [{"field": "items[1].bakeryItemId", "issue": "Duplicate bakeryItemId entries are not allowed in a single order"}]}}
+[9] CR-01 qty=5 POST /api/customer/orders -> 201 (orderId=cmwuxj0690005pzwibgv5vqtn, status=PENDING, totalAmount=42500)
+[10] Stock verification after qty=5 -> stockBefore=50, stockAfter=45
+[11] Preserved BR-04 cross-customer GET /api/customer/orders/cmwuxj0690005pzwibgv5vqtn -> 403 {"error": {"code": "FORBIDDEN", "message": "You do not have permission to access this order."}}
+[12] Preserved FR-01-04 customer GET /api/operator/orders -> 403 {"error": {"code": "FORBIDDEN", "message": "Insufficient role permissions for this resource"}}
+[13] Cleanup PATCH /api/customer/orders/cmwuxj0690005pzwibgv5vqtn/cancel -> 200 (demo stock restored to 50)
+
+RESULT: 13/13 LIVE CLOUD RUN CHECKS PASSED!

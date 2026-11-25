@@ -4,10 +4,18 @@
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **Department:** Department of Computer Engineering, Faculty of Engineering, King Mongkut's University of Technology Thonburi (KMUTT)  
 > **Assigned Project Theme:** Theme 4 — E-Commerce or Ordering System  
-> **Document Version:** `2.0.0` (Sprint 2 Baseline Sync — updated for Lab 5 PostgreSQL/Cloud Run, Lab 6 `#58` `pickupNote` validation, and Sprint 2/3 Contracts)  
+> **Document Version:** `2.0.1` (Sprint 2 Baseline Sync + Lab 7 `CR-01` Maintenance Revision — updated for Lab 5 PostgreSQL/Cloud Run, Lab 6 `#58` `pickupNote` validation, Sprint 2/3 Contracts, and Lab 7 `CR-01` max 5 quantity cap)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
+
+### Revision History
+| Version | Date | Issue / PR | Summary of Changes |
+|---|---|---|---|
+| `1.0.0` | 2026-11-01 | Sprint 1 Baseline (`v1.0.0-sprint1`) | Initial System Requirements Specification covering `F-01`–`F-09`, `BR-01`–`BR-07`, and `NFR-01`–`NFR-06`. |
+| `1.1.0` | 2026-11-24 | Lab 7 `CR-01` (`#74` / `LAB7-ISSUE-01`) | Revised `BR-03` and `FR-03-01` to enforce per-item order quantity cap (`1 <= quantity <= 5`, `MAX_QUANTITY_PER_ITEM = 5`), duplicate `bakeryItemId` rejection (`400 VALIDATION_ERROR`), and `400`-before-`409` error precedence while preserving all existing invariants (`BR-01`, `BR-02`, `BR-03` atomicity, `BR-04`–`BR-07`, Lab 6 `#58`). Approved by TA Section 131 on 2026-11-24. |
+| `2.0.0` | 2026-11-24 | Sprint 2 Baseline (`v2.0.0-sprint2`, `#61`–`#63`) | Synced baseline for Lab 5 PostgreSQL 16 / Cloud Run, Lab 6 `#58` `pickupNote` 500-char validation, and Sprint 2/3 contracts (`F-05`–`F-09`). |
+| `2.0.1` | 2026-11-24 | Lab 7 Release Sync (`v2.0.1-lab7`, `#75`) | Integrated Lab 7 `CR-01` (`v1.1.0`) with Sprint 2 (`v2.0.0-sprint2`). |
 
 ---
 
@@ -60,12 +68,17 @@ CrustCraft enforces six foundational business rules across all architectural lay
 * **BR-02 (Historical Price Snapshot):**  
   When an order is created, each line item (`OrderItem`) MUST snapshot the exact active `BakeryItem.price` into `OrderItem.unitPriceAtOrder` (`Int` satang). Subsequent price modifications or promotions on `BakeryItem` MUST NOT alter historical order items or previously completed order totals.
 
-* **BR-03 (Stock Validation & Transactional Atomicity):**  
-  Every pre-order submission MUST execute within an isolated database transaction (`prisma.$transaction`). The server verifies:
-  1. Requested line item `quantity > 0` (otherwise rejected with `400 VALIDATION_ERROR`).
-  2. Item `isAvailable == true` (otherwise rejected with `409 CONFLICT`).
-  3. `item.stockQuantity >= requested quantity` (otherwise rejected with `409 CONFLICT`).  
-  If any line item fails validation, the entire transaction rolls back; no stock is deducted, and no order record is created.
+* **BR-03 (Per-Item Order Quantity Cap, Stock Validation & Transactional Atomicity — Revised in v1.1.0 / `CR-01`):**  
+  - *Baseline (v1.0.0):* Validated only `quantity > 0` and `quantity <= stockQuantity` with no upper per-item cap.
+  - *Revised Rule (v1.1.0 — `CR-01`):* Before opening a database transaction, the server MUST validate all input constraints on `POST /api/customer/orders`:
+    1. Non-empty `items` array with unique `bakeryItemId` entries — **duplicate `bakeryItemId` entries in the same order** (e.g., splitting `5 + 5` across two lines to bypass the cap) MUST be rejected with `400 VALIDATION_ERROR` (`details[0].field === "items[<index>].bakeryItemId"`).
+    2. Requested line item `quantity` MUST be an integer satisfying **`1 <= quantity <= 5`** (`MAX_QUANTITY_PER_ITEM = 5`); `quantity <= 0` or `quantity > 5` MUST be rejected with `400 VALIDATION_ERROR` (`details[0].field === "items[<index>].quantity"`).
+    3. **Error Precedence (`400` before `409`):** Because input validation runs prior to database stock lookup, any line item violating `quantity > 5` and `quantity > stockQuantity` simultaneously (e.g., `quantity: 6` when `stockQuantity: 3`) MUST return `400 VALIDATION_ERROR` **before** `409 CONFLICT`.
+  - Once pre-transaction validation succeeds, every pre-order submission MUST execute within an isolated database transaction (`prisma.$transaction`) verifying:
+    4. Referenced `bakeryItemId` exists (otherwise `404 NOT_FOUND`).
+    5. Item `isAvailable == true` (otherwise rejected with `409 CONFLICT`).
+    6. `item.stockQuantity >= requested quantity` (otherwise rejected with `409 CONFLICT`).  
+  If any line item fails validation, the entire transaction rolls back; no stock is deducted, and no order record is created. Historical `OrderItem` records persisted prior to `CR-01` remain immutable and unaffected. All existing invariants (`BR-01`, `BR-02`, `BR-04`–`BR-07`, and Lab 6 `#58` `pickupNote <= 500` chars) remain strictly preserved.
 
 * **BR-04 (Customer Ownership & Data Isolation):**  
   Customers are strictly quarantined to their own operational data. A user with role `CUSTOMER` can ONLY view or access orders where `Order.customerId === req.user.userId`. Any attempt by a customer to inspect, query, or mutate an order belonging to another customer MUST be rejected immediately with `403 FORBIDDEN` without leaking entity metadata.
@@ -104,7 +117,7 @@ CrustCraft enforces six foundational business rules across all architectural lay
 * **FR-02-04:** The frontend catalog shall render bakery items with formatted prices in Thai Baht (`฿(price / 100).toFixed(2)`), remaining stock count, and visual availability badges (including `"Out of Stock"` / `"สินค้าหมดชั่วคราว"` when `stockQuantity == 0`).
 
 ### 4.3 Customer Pre-Order Processing (`F-03`)
-* **FR-03-01:** The system shall allow authenticated customers to submit pre-orders (`POST /api/customer/orders`) with line items containing `bakeryItemId`, `quantity`, and an optional `pickupNote` (maximum **500 characters**; inputs exceeding 500 characters are rejected with `400 VALIDATION_ERROR` — enforced since Lab 6 Defect `#58`).
+* **FR-03-01 (Revised in v1.1.0 / `CR-01` & v2.0.1):** The system shall allow authenticated customers to submit pre-orders (`POST /api/customer/orders`) with unique `bakeryItemId` line items where each integer `quantity` satisfies **`1 <= quantity <= 5`** (`MAX_QUANTITY_PER_ITEM = 5`) and an optional `pickupNote` (maximum **500 characters**; inputs exceeding 500 characters are rejected with `400 VALIDATION_ERROR` — enforced since Lab 6 Defect `#58`). Requests containing `quantity > 5` or duplicate `bakeryItemId` entries shall be rejected with `400 VALIDATION_ERROR` (taking precedence over `409 CONFLICT` stock checks) with indexed `details[].field` references, and the frontend order UI shall cap item selection at `Math.min(stockQuantity, 5)` with a `"Max 5 per item"` notice.
 * **FR-03-02:** The server shall compute line item subtotals and overall order `totalAmount` in integer satangs from database item prices, strictly disregarding any client-sent price values (`BR-01`).
 * **FR-03-03:** The system shall snapshot the current `price` into `OrderItem.unitPriceAtOrder` for every line item (`BR-02`).
 * **FR-03-04:** The system shall validate stock and atomically deduct `stockQuantity` within a `prisma.$transaction` block (`BR-03`).
