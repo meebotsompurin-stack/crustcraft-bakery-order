@@ -45,3 +45,6 @@ playwright-report/
 __pycache__/
 *.py[cod]
 *.class
+
+# Submitted reports & course PDFs (keep local only, do not track in Git)
+*.pdf
