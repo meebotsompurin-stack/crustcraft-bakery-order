@@ -2,7 +2,7 @@
 
 > **Course:** CPE 334 Introduction to Software Engineering in the Age of AI Agents (Semester 1/2026)  
 > **System:** CrustCraft Artisan Bakery Pre-Order & Fulfillment System  
-> **Document Version:** `2.0.0` (Sprint 2 Contracts Baseline — `S2-ISSUE-01` / `#61`)  
+> **Document Version:** `2.1.0` (Deliverable 2 Integrated Candidate — `v2.1.0-s3-progress`)  
 > **Authors & Co-Developers:**
 > - Purin Mebotsom (Student ID: `67070507214`, GitHub: [`@meebotsompurin-stack`](https://github.com/meebotsompurin-stack), Role: `Co-Developer`)
 > - Saksorn Buranatananun (Student ID: `67070507208`, GitHub: [`@poom2548`](https://github.com/poom2548), Role: `Co-Developer`)
@@ -17,13 +17,13 @@ The following master registry outlines all nine core capabilities spanning the c
 |---|---|:---:|:---:|---|---|:---:|
 | **F-01** | Authentication, Session Lifecycle & RBAC Foundation | Sprint 1 | Must Have | None | All Users | ✅ Released (`v1.0.0-sprint1`) |
 | **F-02** | Bakery Catalog & Availability View | Sprint 1 | Must Have | F-01 | Customer, Guest | ✅ Released (`v1.0.0-sprint1`) |
-| **F-03** | Customer Pre-Order Creation & Authoritative Server Calculation | Sprint 1 | Must Have | F-01, F-02 | Customer | ✅ Released (`v1.0.0-sprint1`, `#58` fixed) |
+| **F-03** | Customer Pre-Order Creation & Authoritative Server Calculation | Sprint 1 | Must Have | F-01, F-02 | Customer | ✅ Released (`v1.0.0-sprint1`, `#58` fixed, Lab 7 `CR-01` `v2.0.1-lab7`) |
 | **F-04** | Operator Incoming Order Queue & Acceptance | Sprint 1 | Must Have | F-01, F-03 | Operator | ✅ Released (`v1.0.0-sprint1`) |
-| **F-05** | Bakery Catalog Administration | Sprint 2 | Must Have | F-01, F-02 | Operator | 🟡 Specified (`S2-ISSUE-03` / `#63`) |
-| **F-06** | Order Fulfillment & Cancellation Lifecycle | Sprint 2 | Must Have | F-03, F-04 | Operator, Customer | 🟡 Specified (`S2-ISSUE-02` / `#62`) |
-| **F-07** | Simulated Payment Transitions | Sprint 2 | Should Have | F-03, F-04 | Customer, Operator | 🟡 Specified (`S2-ISSUE-02` / `#62`) |
-| **F-08** | Bakery Sales & Order Summary Reporting | Sprint 3 | Should Have | F-04, F-06 | Operator | 🟡 Specified (`S2-ISSUE-04` / `#64` — Deliv. 2 Progress) |
-| **F-09** | Order Search, Filtering & Release Hardening | Sprint 3 | Could Have | F-03, F-04, F-06 | Operator, Customer | 🟡 Specified (Remaining Work — 13 Dec) |
+| **F-05** | Bakery Catalog Administration | Sprint 2 | Must Have | F-01, F-02 | Operator | ✅ Released (`v2.0.0-sprint2` — `S2-ISSUE-03` / `#63`) |
+| **F-06** | Order Fulfillment & Cancellation Lifecycle | Sprint 2 | Must Have | F-03, F-04 | Operator, Customer | ✅ Released (`v2.0.0-sprint2` — `S2-ISSUE-02` / `#62`) |
+| **F-07** | Simulated Payment Transitions | Sprint 2 | Should Have | F-03, F-04 | Customer, Operator | ✅ Released (`v2.0.0-sprint2` — `S2-ISSUE-02` / `#62`) |
+| **F-08** | Bakery Sales & Order Summary Reporting | Sprint 3 | Should Have | F-04, F-06 | Operator | ✅ Implemented & Verified (`v2.1.0-s3-progress` — `S2-ISSUE-04` / `#64`) |
+| **F-09** | Order Search, Filtering & Release Hardening | Sprint 3 | Could Have | F-03, F-04, F-06 | Operator, Customer | ⬜ Planned (Final Delivery — 13 Dec 2026) |
 
 ---
 
